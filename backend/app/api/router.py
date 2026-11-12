@@ -1,6 +1,8 @@
 from fastapi import APIRouter
-from backend.app.api.routes import health
+
+from backend.app.api.routes import health, providers
 
 api_router = APIRouter()
 
 api_router.include_router(health.router, tags=["System"])
+api_router.include_router(providers.router, tags=["Intelligence"])
