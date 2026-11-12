@@ -1,9 +1,16 @@
 
 from dataclasses import dataclass, field
-from typing import Any, Callable, Awaitable
+from typing import Any, Awaitable, Callable, Literal
 
 
 ToolHandler = Callable[..., Any | Awaitable[Any]]
+
+PermissionLevel = Literal[
+    "read",
+    "write",
+    "destructive",
+    "system",
+]
 
 
 @dataclass
@@ -20,6 +27,7 @@ class ToolDefinition:
 
     requires_confirmation: bool = False
     enabled: bool = True
+    permission_level: PermissionLevel = "read"
 
     def __post_init__(self):
         if not self.name.strip():
@@ -30,6 +38,18 @@ class ToolDefinition:
 
         if not callable(self.handler):
             raise ValueError("Tool handler must be callable.")
+
+        valid_permissions = {
+            "read",
+            "write",
+            "destructive",
+            "system",
+        }
+
+        if self.permission_level not in valid_permissions:
+            raise ValueError(
+                "Invalid tool permission level."
+            )
 
 
 class ToolRegistry:
