@@ -1,5 +1,12 @@
 
-from groq import AsyncGroq
+import logging
+
+from groq import (
+    AsyncGroq,
+    APIStatusError,
+    APITimeoutError,
+    APIConnectionError,
+)
 
 from backend.app.core.config import settings
 from backend.app.intelligence.base import (
@@ -7,6 +14,15 @@ from backend.app.intelligence.base import (
     LLMRequest,
     LLMResponse,
 )
+from backend.app.intelligence.errors import (
+    ProviderError,
+    ProviderUnavailable,
+    ProviderTimeout,
+    normalize_status_error,
+)
+
+
+logger = logging.getLogger(__name__)
 
 
 class GroqProvider(LLMProvider):
@@ -37,12 +53,37 @@ class GroqProvider(LLMProvider):
             for message in request.messages
         ]
 
-        completion = await self._client.chat.completions.create(
-            messages=messages,
-            model=self._model,
-            temperature=request.temperature,
-            max_completion_tokens=request.max_output_tokens,
-        )
+        try:
+            completion = await self._client.chat.completions.create(
+                messages=messages,
+                model=self._model,
+                temperature=request.temperature,
+                max_completion_tokens=request.max_output_tokens,
+            )
+
+        except APITimeoutError as error:
+            logger.warning("Groq request timed out.")
+
+            raise ProviderTimeout(
+                "The Groq provider request timed out."
+            ) from error
+
+        except APIConnectionError as error:
+            logger.warning("Groq connection failed.")
+
+            raise ProviderUnavailable(
+                "The Groq provider is temporarily unreachable."
+            ) from error
+
+        except APIStatusError as error:
+            logger.warning(
+                "Groq API request failed. Status: %s",
+                error.status_code,
+            )
+
+            raise normalize_status_error(
+                status_code=error.status_code,
+            ) from error
 
         choice = completion.choices[0]
         usage = completion.usage

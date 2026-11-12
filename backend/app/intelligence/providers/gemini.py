@@ -1,6 +1,9 @@
 
+import logging
+
 from google import genai
 from google.genai import types
+from google.genai.errors import APIError
 
 from backend.app.core.config import settings
 from backend.app.intelligence.base import (
@@ -8,6 +11,14 @@ from backend.app.intelligence.base import (
     LLMRequest,
     LLMResponse,
 )
+from backend.app.intelligence.errors import (
+    ProviderError,
+    ProviderTimeout,
+    normalize_status_error,
+)
+
+
+logger = logging.getLogger(__name__)
 
 
 class GeminiProvider(LLMProvider):
@@ -29,6 +40,24 @@ class GeminiProvider(LLMProvider):
     def provider_name(self) -> str:
         return "gemini"
 
+    def _normalize_error(self, error: APIError) -> ProviderError:
+        """Translate Gemini API errors into SILVANA exceptions."""
+
+        status_code = getattr(error, "code", None)
+
+        if not isinstance(status_code, int):
+            status_code = getattr(error, "status", None)
+
+        if not isinstance(status_code, int):
+            return ProviderError(
+                "The Gemini provider encountered an unexpected error."
+            )
+
+        return normalize_status_error(
+            status_code=status_code,
+            message=str(getattr(error, "message", "")),
+        )
+
     async def generate(self, request: LLMRequest) -> LLMResponse:
 
         system_messages = [
@@ -47,7 +76,9 @@ class GeminiProvider(LLMProvider):
         ]
 
         if not contents:
-            raise ValueError("At least one user or assistant message is required.")
+            raise ValueError(
+                "At least one user or assistant message is required."
+            )
 
         config = types.GenerateContentConfig(
             temperature=request.temperature,
@@ -55,11 +86,20 @@ class GeminiProvider(LLMProvider):
             system_instruction="\n\n".join(system_messages) or None,
         )
 
-        response = await self._async_client.models.generate_content(
-            model=self._model,
-            contents=contents,
-            config=config,
-        )
+        try:
+            response = await self._async_client.models.generate_content(
+                model=self._model,
+                contents=contents,
+                config=config,
+            )
+
+        except APIError as error:
+            logger.warning(
+                "Gemini API request failed. Status: %s",
+                getattr(error, "code", None),
+            )
+
+            raise self._normalize_error(error) from error
 
         usage = response.usage_metadata
 
