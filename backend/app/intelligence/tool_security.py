@@ -48,7 +48,9 @@ class ToolSecurityManager:
         granted_permissions: set[str] | None = None,
     ):
         self.granted_permissions = (
-            granted_permissions or {"read"}
+            {"read"}
+            if granted_permissions is None
+            else set(granted_permissions)
         )
 
         invalid_permissions = (
