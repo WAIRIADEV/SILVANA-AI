@@ -6,7 +6,11 @@ from fastapi import APIRouter, Depends, HTTPException
 from backend.app.api.dependencies import get_provider_manager
 from backend.app.api.schemas.chat import ChatRequest, ChatResponse
 from backend.app.intelligence.base import ChatMessage, LLMRequest
+from backend.app.intelligence.conversation_context import (
+    ConversationContextAnalyzer,
+)
 from backend.app.intelligence.identity import SILVANA_SYSTEM_INSTRUCTION
+from backend.app.intelligence.intent_engine import IntentEngine
 from backend.app.intelligence.errors import (
     ProviderAuthenticationError,
     ProviderRequestError,
@@ -19,6 +23,9 @@ from backend.app.intelligence.provider_manager import ProviderManager
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+context_analyzer = ConversationContextAnalyzer()
+intent_engine = IntentEngine()
 
 
 @router.post("/chat", response_model=ChatResponse)
@@ -53,19 +60,48 @@ async def create_chat_completion(
             detail="The selected AI provider is not configured.",
         )
 
+    # Convert the incoming conversation into internal messages.
+    conversation_messages = [
+        ChatMessage(
+            role=message.role,
+            content=message.content,
+        )
+        for message in request.messages
+    ]
+
+    # Extract context from the conversation history.
+    conversation_context = context_analyzer.analyze(
+        conversation_messages
+    )
+
+    # Classify the latest user request using its context.
+    intent_result = intent_engine.classify(
+        conversation_context.latest_user_message or "",
+        context=conversation_context,
+    )
+
+    # Record classification metadata without logging user content.
+    logger.info(
+        (
+            "Request classified. Intent: %s, Confidence: %.2f, "
+            "Follow-up: %s, Correction: %s, New topic: %s, "
+            "Context rule: %s"
+        ),
+        intent_result.intent.value,
+        intent_result.confidence,
+        intent_result.is_follow_up,
+        intent_result.is_correction,
+        intent_result.is_new_topic,
+        intent_result.context_rule,
+    )
+
     # Inject SILVANA's trusted identity before conversation history.
     messages = [
         ChatMessage(
             role="system",
             content=SILVANA_SYSTEM_INSTRUCTION,
         ),
-        *[
-            ChatMessage(
-                role=message.role,
-                content=message.content,
-            )
-            for message in request.messages
-        ],
+        *conversation_messages,
     ]
 
     llm_request = LLMRequest(

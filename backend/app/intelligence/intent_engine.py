@@ -1,7 +1,11 @@
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import Enum
+
+from backend.app.intelligence.conversation_context import (
+    ConversationContext,
+)
 
 
 class Intent(str, Enum):
@@ -21,14 +25,23 @@ class IntentResult:
     requires_confirmation: bool
     matched_rule: str | None = None
 
+    # Conversation context metadata.
+    is_follow_up: bool = False
+    is_correction: bool = False
+    is_new_topic: bool = False
+    references_previous_context: bool = False
+    context_rule: str | None = None
+
 
 class IntentEngine:
     """
     Baseline rule-based intent classifier.
 
     Confidence values are heuristic scores, not calibrated
-    probabilities. This engine classifies requests only;
-    it does not execute tools or actions.
+    probabilities. This engine classifies requests only.
+
+    Optional conversation context enriches the classification
+    result but does not independently change its intent.
     """
 
     _RULES = [
@@ -37,13 +50,11 @@ class IntentEngine:
             0.92,
             "explicit_action",
             (
-                # Reminder requests.
                 r"\b(remind me|set a reminder)\b",
                 r"\b(i need a reminder|i want a reminder)\b",
                 r"\b(don't let me forget|do not let me forget)\b",
                 r"\b(make sure i remember)\b",
 
-                # Explicit actions involving identifiable objects.
                 r"\b(remind me|set a reminder|schedule|book|send|"
                 r"delete|remove|rename|move|copy|create|make|open|"
                 r"close|download|upload|install|launch)\b.*"
@@ -51,7 +62,6 @@ class IntentEngine:
                 r"appointment|calendar event|application|app|"
                 r"browser|workflow)\b",
 
-                # Application and service controls.
                 r"\b(turn on|turn off|enable|disable)\b.*"
                 r"\b(application|app|service|feature|device)\b",
             ),
@@ -97,10 +107,33 @@ class IntentEngine:
         ),
     ]
 
-    def classify(self, text: str) -> IntentResult:
+    def classify(
+        self,
+        text: str,
+        context: ConversationContext | None = None,
+    ) -> IntentResult:
         """
-        Classify a user request using ordered keyword rules.
+        Classify a user request and optionally attach conversation context.
         """
+
+        result = self._classify_message(text)
+
+        if context is None:
+            return result
+
+        return replace(
+            result,
+            is_follow_up=context.is_follow_up,
+            is_correction=context.is_correction,
+            is_new_topic=context.is_new_topic,
+            references_previous_context=(
+                context.references_previous_context
+            ),
+            context_rule=context.matched_rule,
+        )
+
+    def _classify_message(self, text: str) -> IntentResult:
+        """Apply the existing deterministic intent rules."""
 
         if not isinstance(text, str) or not text.strip():
             return IntentResult(

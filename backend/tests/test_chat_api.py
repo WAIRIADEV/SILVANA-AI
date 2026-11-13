@@ -5,6 +5,7 @@ from fastapi.testclient import TestClient
 
 from backend.app.main import app
 from backend.app.api.dependencies import get_provider_manager
+from backend.app.api.routes import chat as chat_route
 from backend.app.intelligence.base import LLMResponse
 from backend.app.intelligence.errors import (
     ProviderAuthenticationError,
@@ -38,7 +39,6 @@ class FakeProvider:
 
         # Verify the original conversation remains intact.
         assert request.messages[-1].role == "user"
-        assert request.messages[-1].content == "Hello SILVANA"
 
         return LLMResponse(
             content="Hello. I am SILVANA.",
@@ -226,11 +226,19 @@ def test_chat_endpoint_rejects_invalid_request(monkeypatch):
         (ProviderTimeout("Simulated timeout"), 504),
         (ProviderUnavailable("Simulated outage"), 503),
         (
-            ProviderAuthenticationError("Simulated authentication failure"),
+            ProviderAuthenticationError(
+                "Simulated authentication failure"
+            ),
             502,
         ),
-        (ProviderRequestError("Simulated request failure"), 502),
-        (RuntimeError("Simulated unexpected failure"), 502),
+        (
+            ProviderRequestError("Simulated request failure"),
+            502,
+        ),
+        (
+            RuntimeError("Simulated unexpected failure"),
+            502,
+        ),
     ],
 )
 def test_chat_endpoint_handles_provider_failures(
@@ -258,3 +266,158 @@ def test_chat_endpoint_handles_provider_failures(
 
     assert response.status_code == expected_status
     assert "detail" in response.json()
+
+
+# ---------------------------------------------------------
+# CONVERSATION INTELLIGENCE API INTEGRATION
+# ---------------------------------------------------------
+
+def test_chat_endpoint_runs_intent_classification(monkeypatch):
+    install_fake_manager(monkeypatch)
+
+    original_classify = chat_route.intent_engine.classify
+    captured_results = []
+
+    def classify_spy(text, context=None):
+        result = original_classify(text, context)
+        captured_results.append(result)
+        return result
+
+    monkeypatch.setattr(
+        chat_route.intent_engine,
+        "classify",
+        classify_spy,
+    )
+
+    with TestClient(app) as client:
+        response = client.post(
+            "/api/v1/chat",
+            json={
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": "Explain regression.",
+                    },
+                    {
+                        "role": "assistant",
+                        "content": "Regression models relationships.",
+                    },
+                    {
+                        "role": "user",
+                        "content": "Give me an example.",
+                    },
+                ]
+            },
+        )
+
+    assert response.status_code == 200
+    assert len(captured_results) == 1
+
+    result = captured_results[0]
+
+    assert result.is_follow_up is True
+    assert result.references_previous_context is True
+    assert result.context_rule == "follow_up"
+
+
+def test_chat_endpoint_preserves_full_conversation_for_provider(
+    monkeypatch,
+):
+    install_fake_manager(monkeypatch)
+
+    captured_requests = []
+
+    class InspectingProvider(FakeProvider):
+
+        async def generate(self, request):
+            captured_requests.append(request)
+            return await super().generate(request)
+
+    class InspectingManager(FakeManager):
+
+        def get_provider(self, name):
+            return InspectingProvider(provider_name=name)
+
+    install_fake_manager(
+        monkeypatch,
+        InspectingManager(),
+    )
+
+    with TestClient(app) as client:
+        response = client.post(
+            "/api/v1/chat",
+            json={
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": "Explain regression.",
+                    },
+                    {
+                        "role": "assistant",
+                        "content": "Regression models relationships.",
+                    },
+                    {
+                        "role": "user",
+                        "content": "Give me an example.",
+                    },
+                ]
+            },
+        )
+
+    assert response.status_code == 200
+    assert len(captured_requests) == 1
+
+    messages = captured_requests[0].messages
+
+    assert messages[0].role == "system"
+    assert messages[1].content == "Explain regression."
+    assert messages[2].content == "Regression models relationships."
+    assert messages[3].content == "Give me an example."
+
+
+def test_chat_endpoint_classifies_new_topic(monkeypatch):
+    install_fake_manager(monkeypatch)
+
+    captured_results = []
+    original_classify = chat_route.intent_engine.classify
+
+    def classify_spy(text, context=None):
+        result = original_classify(text, context)
+        captured_results.append(result)
+        return result
+
+    monkeypatch.setattr(
+        chat_route.intent_engine,
+        "classify",
+        classify_spy,
+    )
+
+    with TestClient(app) as client:
+        response = client.post(
+            "/api/v1/chat",
+            json={
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": "Explain regression.",
+                    },
+                    {
+                        "role": "assistant",
+                        "content": "Regression models relationships.",
+                    },
+                    {
+                        "role": "user",
+                        "content": "New topic: explain computer vision.",
+                    },
+                ]
+            },
+        )
+
+    assert response.status_code == 200
+    assert len(captured_results) == 1
+
+    result = captured_results[0]
+
+    assert result.is_new_topic is True
+    assert result.is_follow_up is False
+    assert result.references_previous_context is False
