@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from backend.app.api.dependencies import get_provider_manager
 from backend.app.api.schemas.chat import ChatRequest, ChatResponse
 from backend.app.intelligence.base import ChatMessage, LLMRequest
+from backend.app.intelligence.identity import SILVANA_SYSTEM_INSTRUCTION
 from backend.app.intelligence.errors import (
     ProviderAuthenticationError,
     ProviderRequestError,
@@ -52,13 +53,19 @@ async def create_chat_completion(
             detail="The selected AI provider is not configured.",
         )
 
-    # Convert API messages into the internal message format.
+    # Inject SILVANA's trusted identity before conversation history.
     messages = [
         ChatMessage(
-            role=message.role,
-            content=message.content,
-        )
-        for message in request.messages
+            role="system",
+            content=SILVANA_SYSTEM_INSTRUCTION,
+        ),
+        *[
+            ChatMessage(
+                role=message.role,
+                content=message.content,
+            )
+            for message in request.messages
+        ],
     ]
 
     llm_request = LLMRequest(

@@ -1,13 +1,15 @@
 
 from typing import Literal
 
+from backend.app.intelligence.identity import SILVANA_SYSTEM_INSTRUCTION
+
 from pydantic import BaseModel, Field
 
 
 class ChatMessageSchema(BaseModel):
     """A single message in a conversation."""
 
-    role: Literal["system", "user", "assistant"]
+    role: Literal["user", "assistant"]
 
     content: str = Field(
         min_length=1,
