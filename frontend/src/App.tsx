@@ -1,6 +1,8 @@
+
 import './App.css'
 import { useBackendHealth } from './hooks/useBackendHealth'
 import HolographicCore from './components/HolographicCore'
+import ChatInterface from './components/ChatInterface'
 
 function App() {
   const backendHealth = useBackendHealth()
@@ -46,7 +48,7 @@ function App() {
           <span>CORE 0.1.0</span>
         </div>
       </header>
-
+<div className="workspace-layout">
       <section className="observation-stage">
         <div className="corner-mark top-left" />
         <div className="corner-mark top-right" />
@@ -116,6 +118,9 @@ function App() {
           <span>VERIFY</span>
         </div>
       </section>
+
+      <ChatInterface />
+    </div>
 
       <footer className="interface-footer">
         <div className="footer-brand">
