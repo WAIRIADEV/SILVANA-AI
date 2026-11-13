@@ -396,3 +396,232 @@
     animation: none;
   }
 }
+
+/* =====================================================
+   SILVANA MARKDOWN RESPONSE RENDERING
+===================================================== */
+
+.assistant .message-text {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+/* Paragraphs */
+
+.assistant .message-text p {
+  margin: 0 0 13px;
+  line-height: 1.85;
+}
+
+.assistant .message-text p:last-child {
+  margin-bottom: 0;
+}
+
+/* Headings */
+
+.assistant .message-text h1,
+.assistant .message-text h2,
+.assistant .message-text h3,
+.assistant .message-text h4 {
+  margin: 22px 0 10px;
+  color: #a9eaff;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.assistant .message-text h1 {
+  font-size: 19px;
+}
+
+.assistant .message-text h2 {
+  font-size: 16px;
+}
+
+.assistant .message-text h3 {
+  font-size: 14px;
+}
+
+.assistant .message-text h4 {
+  font-size: 13px;
+}
+
+.assistant .message-text h1:first-child,
+.assistant .message-text h2:first-child,
+.assistant .message-text h3:first-child {
+  margin-top: 0;
+}
+
+/* Bold and italic text */
+
+.assistant .message-text strong {
+  color: #a8eaff;
+  font-weight: 700;
+}
+
+.assistant .message-text em {
+  color: #a9c8d9;
+}
+
+/* Lists */
+
+.assistant .message-text ul,
+.assistant .message-text ol {
+  margin: 10px 0 16px;
+  padding-left: 24px;
+}
+
+.assistant .message-text li {
+  margin: 6px 0;
+  padding-left: 4px;
+  line-height: 1.75;
+}
+
+.assistant .message-text li::marker {
+  color: #55d9ff;
+}
+
+.assistant .message-text li > ul,
+.assistant .message-text li > ol {
+  margin: 5px 0;
+}
+
+/* Inline code */
+
+.assistant .message-text :not(pre) > code {
+  padding: 3px 6px;
+  border: 1px solid rgba(85, 217, 255, 0.16);
+  border-radius: 4px;
+  background: rgba(85, 217, 255, 0.08);
+  color: #8ceaff;
+  font-family: var(--font-mono);
+  font-size: 0.88em;
+  overflow-wrap: anywhere;
+}
+
+/* Code blocks */
+
+.assistant .message-text pre {
+  max-width: 100%;
+  margin: 14px 0;
+  padding: 15px;
+  overflow-x: auto;
+  border: 1px solid rgba(85, 217, 255, 0.17);
+  border-radius: 5px;
+  background: rgba(2, 8, 14, 0.9);
+  scrollbar-width: thin;
+  scrollbar-color: rgba(85, 217, 255, 0.35) transparent;
+}
+
+.assistant .message-text pre code {
+  color: #b9e8f5;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.8;
+  white-space: pre;
+}
+
+/* Tables */
+
+.assistant .message-text table {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  margin: 15px 0;
+  overflow-x: auto;
+  border-collapse: collapse;
+  font-size: 12px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(85, 217, 255, 0.35) transparent;
+}
+
+.assistant .message-text th,
+.assistant .message-text td {
+  min-width: 105px;
+  padding: 10px 12px;
+  border: 1px solid rgba(85, 217, 255, 0.15);
+  text-align: left;
+  line-height: 1.6;
+  vertical-align: top;
+}
+
+.assistant .message-text th {
+  background: rgba(85, 217, 255, 0.09);
+  color: #9deaff;
+  font-weight: 600;
+}
+
+.assistant .message-text td {
+  color: #c0d5e1;
+}
+
+.assistant .message-text tr:nth-child(even) td {
+  background: rgba(85, 217, 255, 0.025);
+}
+
+/* Blockquotes */
+
+.assistant .message-text blockquote {
+  margin: 14px 0;
+  padding: 10px 15px;
+  border-left: 2px solid #55d9ff;
+  background: rgba(85, 217, 255, 0.055);
+  color: #a8c5d5;
+}
+
+.assistant .message-text blockquote p {
+  margin: 0;
+}
+
+/* Dividers */
+
+.assistant .message-text hr {
+  margin: 20px 0;
+  border: 0;
+  border-top: 1px solid rgba(85, 217, 255, 0.18);
+}
+
+/* Links */
+
+.assistant .message-text a {
+  color: #69dfff;
+  text-decoration: underline;
+  text-decoration-color: rgba(105, 223, 255, 0.4);
+  text-underline-offset: 3px;
+}
+
+.assistant .message-text a:hover {
+  color: #b1f0ff;
+}
+
+/* Task lists */
+
+.assistant .message-text input[type='checkbox'] {
+  margin-right: 8px;
+  accent-color: #55d9ff;
+}
+
+/* Mobile readability */
+
+@media (max-width: 600px) {
+  .assistant .message-text h1 {
+    font-size: 17px;
+  }
+
+  .assistant .message-text h2 {
+    font-size: 15px;
+  }
+
+  .assistant .message-text pre {
+    padding: 11px;
+  }
+
+  .assistant .message-text pre code {
+    font-size: 10px;
+  }
+
+  .assistant .message-text th,
+  .assistant .message-text td {
+    padding: 8px;
+    font-size: 11px;
+  }
+}

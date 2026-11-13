@@ -1,5 +1,7 @@
 
 import { useEffect, useRef, useState } from 'react'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import { sendChatMessage } from '../services/api/chat'
 import type { ChatMessage, ChatResponse } from '../types/api'
 import './ChatInterface.css'
@@ -143,7 +145,7 @@ function ChatInterface() {
           onClick={clearConversation}
           disabled={!hasMessages || isSending}
         >
-          <span aria-hidden="true">↺</span>
+          <span aria-hidden="true">â†º</span>
           CLEAR
         </button>
       </div>
@@ -155,7 +157,7 @@ function ChatInterface() {
       >
         {!hasMessages && (
           <div className="conversation-empty">
-            <div className="empty-symbol">◈</div>
+            <div className="empty-symbol">â—ˆ</div>
 
             <h3>READY WHEN YOU ARE</h3>
 
@@ -181,7 +183,13 @@ function ChatInterface() {
               </div>
 
               <div className="message-text">
-                {message.content}
+                {message.role === 'assistant' ? (
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                    {message.content}
+                  </ReactMarkdown>
+                ) : (
+                  message.content
+                )}
               </div>
 
               {message.metadata && (
@@ -257,7 +265,7 @@ function ChatInterface() {
             disabled={!input.trim() || isSending}
             aria-label="Send message"
           >
-            {isSending ? '...' : 'SEND ↗'}
+            {isSending ? '...' : 'SEND â†—'}
           </button>
         </div>
 
