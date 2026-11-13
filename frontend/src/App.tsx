@@ -1,222 +1,142 @@
-
 import './App.css'
 import { useBackendHealth } from './hooks/useBackendHealth'
+import HolographicCore from './components/HolographicCore'
 
 function App() {
   const backendHealth = useBackendHealth()
 
-  const backendStatusLabel =
+  const backendStatus =
     backendHealth.status === 'operational'
       ? 'ONLINE'
       : backendHealth.status === 'checking'
-        ? 'CHECKING'
+        ? 'CONNECTING'
         : 'OFFLINE'
 
-  const backendStatusClass =
+  const backendClass =
     backendHealth.status === 'operational'
-      ? 'status-online'
-      : 'status-pending'
+      ? 'telemetry-value online'
+      : backendHealth.status === 'checking'
+        ? 'telemetry-value pending'
+        : 'telemetry-value offline'
 
   return (
-    <main className="silvana-shell">
-      <header className="topbar">
-        <div className="brand">
-          <div className="brand-mark">S</div>
+    <main className="silvana-interface">
+      <div className="ambient-grid" />
+
+      <header className="interface-header">
+        <div className="identity">
+          <div className="identity-symbol">◈</div>
+
           <div>
-            <div className="brand-name">SILVANA</div>
-            <div className="brand-subtitle">INTELLIGENT SYSTEMS</div>
+            <div className="identity-name">SILVANA</div>
+            <div className="identity-subtitle">
+              INTELLIGENCE SYSTEMS
+            </div>
           </div>
         </div>
 
-        <div className="topbar-center">
-          <span className="system-indicator" />
-          INTERFACE INITIALIZED
+        <div className="header-center">
+          <span className="live-indicator" />
+          SYSTEM ACTIVE
         </div>
 
-        <div className="topbar-right">
-          <span className="environment-label">LOCAL ENVIRONMENT</span>
-          <span className="version-label">v0.1.0</span>
+        <div className="header-meta">
+          <span>LOCAL INSTANCE</span>
+          <span className="meta-divider">/</span>
+          <span>CORE 0.1.0</span>
         </div>
       </header>
 
-      <div className="workspace">
-        <aside className="left-panel">
-          <div className="panel-heading">NAVIGATION</div>
+      <section className="observation-stage">
+        <div className="corner-mark top-left" />
+        <div className="corner-mark top-right" />
+        <div className="corner-mark bottom-left" />
+        <div className="corner-mark bottom-right" />
 
-          <nav className="navigation">
-            <div className="nav-item active">
-              <span>◈</span>
-              Overview
-            </div>
+        <div className="stage-topline">
+          <span>ARTIFICIAL INTELLIGENCE</span>
+          <span>VISUALIZATION UNIT / 001</span>
+        </div>
 
-            <div className="nav-item">
-              <span>⌘</span>
-              Intelligence
-            </div>
+        <div className="hologram-container">
+          <div className="holo-backdrop" />
 
-            <div className="nav-item">
-              <span>◤</span>
-              Documents
-            </div>
+          <div className="scanner-ring ring-one" />
+          <div className="scanner-ring ring-two" />
+          <div className="scanner-ring ring-three" />
 
-            <div className="nav-item">
-              <span>⌁</span>
-              Workflows
-            </div>
+          <div className="vertical-beam" />
 
-            <div className="nav-item">
-              <span>◷</span>
-              Activity
-            </div>
-          </nav>
+          <HolographicCore />
 
-          <div className="left-panel-footer">
-            <div className="panel-heading">SYSTEM VERSION</div>
-            <div className="muted-value">SILVANA CORE 0.1</div>
-            <div className="muted-value">LOCAL INSTANCE</div>
-          </div>
-        </aside>
+          <div className="scan-line" />
+        </div>
 
-        <section className="main-stage">
-          <div className="stage-heading">
-            <div>
-              <div className="eyebrow">
-                PERSONAL INTELLIGENCE SYSTEM
-              </div>
-
-              <h1>Good to have you here.</h1>
-
-              <p className="stage-description">
-                Observe. Understand. Execute. Verify.
-              </p>
-            </div>
-
-            <div className="session-indicator">
-              <span className="system-indicator" />
-              SESSION READY
-            </div>
+        <div className="observation-message">
+          <div className="message-overline">
+            <span />
+            PERCEPTION SYSTEM ENGAGED
+            <span />
           </div>
 
-          <div className="hologram-stage">
-            <div className="stage-grid" />
+          <h1>SILVANA IS WATCHING</h1>
 
-            <div className="hologram">
-              <div className="orbit orbit-outer" />
-              <div className="orbit orbit-middle" />
-              <div className="orbit orbit-inner" />
+          <p>
+            OBSERVING ENVIRONMENT <span>·</span> AWAITING INPUT
+          </p>
+        </div>
 
-              <div className="hologram-core">
-                <div className="core-inner">
-                  <span>S</span>
-                </div>
-              </div>
+        <div className="side-readout readout-left">
+          <span className="readout-label">ENTITY</span>
+          <span className="readout-value">SILVANA_01</span>
+          <span className="readout-label">MODE</span>
+          <span className="readout-value cyan">OBSERVATION</span>
+        </div>
 
-              <div className="core-glow" />
-            </div>
+        <div className="side-readout readout-right">
+          <span className="readout-label">CORE STATUS</span>
+          <span className="readout-value cyan">ACTIVE</span>
+          <span className="readout-label">RENDER ENGINE</span>
+          <span className="readout-value">THREE.JS</span>
+        </div>
 
-            <div className="hologram-caption">
-              <span className="caption-line" />
-              <span>HOLOGRAPHIC CORE</span>
-              <span className="caption-line" />
-            </div>
+        <div className="stage-bottomline">
+          <span>OBSERVE</span>
+          <span className="bottomline-track">
+            <span />
+          </span>
+          <span>UNDERSTAND</span>
+          <span className="bottomline-track">
+            <span />
+          </span>
+          <span>EXECUTE</span>
+          <span className="bottomline-track">
+            <span />
+          </span>
+          <span>VERIFY</span>
+        </div>
+      </section>
 
-            <div className="stage-coordinate coordinate-left">
-              CORE / 001
-            </div>
+      <footer className="interface-footer">
+        <div className="footer-brand">
+          SILVANA INTELLIGENCE SYSTEMS
+        </div>
 
-            <div className="stage-coordinate coordinate-right">
-              VISUALIZATION PENDING
-            </div>
-          </div>
+        <div className="footer-status">
+          <span className="footer-dot" />
+          FRONTEND ONLINE
 
-          <div className="interaction-area">
-            <div className="interaction-heading">
-              <span>COMMAND INTERFACE</span>
-              <span className="muted-value">VOICE / TEXT</span>
-            </div>
+          <span className="footer-separator">/</span>
 
-            <div className="command-placeholder">
-              <span className="command-symbol">›</span>
-              <span>
-                Awaiting connection to SILVANA intelligence...
-              </span>
-            </div>
-          </div>
-        </section>
+          BACKEND
+          <span className={backendClass}>
+            {backendStatus}
+          </span>
+        </div>
 
-        <aside className="right-panel">
-          <div className="panel-section">
-            <div className="panel-heading">SYSTEM STATUS</div>
-
-            <div className="status-row">
-              <span>Frontend</span>
-              <span className="status-online">ONLINE</span>
-            </div>
-
-            <div className="status-row">
-              <span>Backend API</span>
-
-              <span
-                className={backendStatusClass}
-                title={
-                  backendHealth.error ??
-                  backendHealth.data?.message ??
-                  ''
-                }
-              >
-                {backendStatusLabel}
-              </span>
-            </div>
-
-            <div className="status-row">
-              <span>AI Providers</span>
-              <span className="status-pending">PENDING</span>
-            </div>
-
-            <div className="status-row">
-              <span>Voice Engine</span>
-              <span className="status-pending">PENDING</span>
-            </div>
-          </div>
-
-          <div className="panel-divider" />
-
-          <div className="panel-section">
-            <div className="panel-heading">INTELLIGENCE</div>
-
-            <div className="metric-card">
-              <div className="metric-label">ACTIVE PROVIDERS</div>
-              <div className="metric-value">--</div>
-              <div className="metric-description">
-                Awaiting backend telemetry
-              </div>
-            </div>
-
-            <div className="metric-card">
-              <div className="metric-label">EXECUTIONS</div>
-              <div className="metric-value">--</div>
-              <div className="metric-description">
-                No execution data received
-              </div>
-            </div>
-          </div>
-
-          <div className="panel-divider" />
-
-          <div className="panel-section">
-            <div className="panel-heading">SYSTEM PRINCIPLES</div>
-
-            <div className="principle">01 / Observe</div>
-            <div className="principle">02 / Understand</div>
-            <div className="principle">03 / Execute</div>
-            <div className="principle">04 / Verify</div>
-          </div>
-        </aside>
-      </div>
-
-      <footer className="footer">
-        <span>SILVANA INTELLIGENCE SYSTEMS</span>
-        <span>LOCAL INSTANCE · DEVELOPMENT MODE</span>
+        <div className="footer-version">
+          LOCAL INSTANCE · DEVELOPMENT MODE
+        </div>
       </footer>
     </main>
   )

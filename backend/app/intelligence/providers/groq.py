@@ -43,6 +43,36 @@ class GroqProvider(LLMProvider):
     def provider_name(self) -> str:
         return "groq"
 
+    async def check_connection(self) -> None:
+        """Verify authenticated connectivity to the Groq API."""
+
+        try:
+            await self._client.models.list()
+
+        except APITimeoutError as error:
+            logger.warning("Groq health check timed out.")
+
+            raise ProviderTimeout(
+                "The Groq health check timed out."
+            ) from error
+
+        except APIConnectionError as error:
+            logger.warning("Groq health check connection failed.")
+
+            raise ProviderUnavailable(
+                "The Groq provider is temporarily unreachable."
+            ) from error
+
+        except APIStatusError as error:
+            logger.warning(
+                "Groq health check failed. Status: %s",
+                error.status_code,
+            )
+
+            raise normalize_status_error(
+                status_code=error.status_code,
+            ) from error
+
     async def generate(self, request: LLMRequest) -> LLMResponse:
 
         messages = [

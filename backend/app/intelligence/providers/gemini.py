@@ -13,7 +13,6 @@ from backend.app.intelligence.base import (
 )
 from backend.app.intelligence.errors import (
     ProviderError,
-    ProviderTimeout,
     normalize_status_error,
 )
 
@@ -22,6 +21,7 @@ logger = logging.getLogger(__name__)
 
 
 class GeminiProvider(LLMProvider):
+    """Gemini implementation of SILVANA's LLM provider interface."""
 
     def __init__(self):
         if not settings.GEMINI_API_KEY:
@@ -58,7 +58,22 @@ class GeminiProvider(LLMProvider):
             message=str(getattr(error, "message", "")),
         )
 
+    async def check_connection(self) -> None:
+        """Verify authenticated connectivity to the Gemini API."""
+
+        try:
+            await self._async_client.models.list()
+
+        except APIError as error:
+            logger.warning(
+                "Gemini health check failed. Status: %s",
+                getattr(error, "code", None),
+            )
+
+            raise self._normalize_error(error) from error
+
     async def generate(self, request: LLMRequest) -> LLMResponse:
+        """Generate a response using the configured Gemini model."""
 
         system_messages = [
             message.content
@@ -69,7 +84,7 @@ class GeminiProvider(LLMProvider):
         contents = [
             types.Content(
                 role="model" if message.role == "assistant" else "user",
-                parts=[types.Part.from_text(text=message.content)]
+                parts=[types.Part.from_text(text=message.content)],
             )
             for message in request.messages
             if message.role != "system"
@@ -104,6 +119,7 @@ class GeminiProvider(LLMProvider):
         usage = response.usage_metadata
 
         finish_reason = None
+
         if response.candidates:
             reason = response.candidates[0].finish_reason
             finish_reason = str(reason) if reason else None
@@ -122,5 +138,7 @@ class GeminiProvider(LLMProvider):
         )
 
     async def aclose(self):
+        """Close Gemini SDK clients and release resources."""
+
         await self._async_client.aclose()
         self._client.close()
