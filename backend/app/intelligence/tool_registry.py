@@ -28,6 +28,7 @@ class ToolDefinition:
     requires_confirmation: bool = False
     enabled: bool = True
     permission_level: PermissionLevel = "read"
+    supported_intents: set[str] = field(default_factory=set)
 
     def __post_init__(self):
         if not self.name.strip():
@@ -47,9 +48,24 @@ class ToolDefinition:
         }
 
         if self.permission_level not in valid_permissions:
-            raise ValueError(
-                "Invalid tool permission level."
+            raise ValueError("Invalid tool permission level.")
+
+        if not isinstance(self.supported_intents, (set, frozenset)):
+            raise TypeError(
+                "Supported intents must be a set of strings."
             )
+
+        normalized_intents = set()
+
+        for intent in self.supported_intents:
+            if not isinstance(intent, str) or not intent.strip():
+                raise ValueError(
+                    "Supported intents must contain non-empty strings."
+                )
+
+            normalized_intents.add(intent.strip().lower())
+
+        self.supported_intents = normalized_intents
 
 
 class ToolRegistry:
