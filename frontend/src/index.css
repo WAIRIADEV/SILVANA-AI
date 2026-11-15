@@ -26,6 +26,8 @@
   --border-bright: rgba(85, 217, 255, 0.3);
 
   --font-mono: 'Space Mono', monospace;
+
+  color-scheme: dark;
 }
 
 * {
@@ -43,14 +45,19 @@ body,
 }
 
 body {
-  background: var(--bg-primary);
   overflow: hidden;
+  background: var(--bg-primary);
 }
 
 button,
 input,
-textarea {
+textarea,
+select {
   font: inherit;
+}
+
+button {
+  color: inherit;
 }
 
 ::selection {
@@ -59,5 +66,26 @@ textarea {
 }
 
 #root {
+  min-height: 0;
   overflow: hidden;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+@media (max-width: 700px) {
+  html,
+  body,
+  #root {
+    height: auto;
+    min-height: 100%;
+  }
+
+  body,
+  #root {
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
 }
