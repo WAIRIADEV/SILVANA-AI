@@ -1,7 +1,10 @@
 
+import inspect
+import logging
+
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any
+from typing import Any, Awaitable, Callable
 
 from backend.app.intelligence.capability_resolver import CapabilityResolver
 from backend.app.intelligence.execution_engine import (
@@ -14,6 +17,14 @@ from backend.app.intelligence.verification_engine import (
     VerificationResult,
     VerificationStatus,
 )
+
+
+logger = logging.getLogger(__name__)
+
+StateObserver = Callable[
+    [str],
+    Awaitable[None] | None,
+]
 
 
 class OrchestrationStatus(str, Enum):
@@ -55,12 +66,38 @@ class ToolOrchestrator:
         self.execution_engine = execution_engine
         self.verification_engine = verification_engine
 
+    async def _notify_state(
+        self,
+        observer: StateObserver | None,
+        state: str,
+    ) -> None:
+        """
+        Notify an optional observer without allowing monitoring
+        failures to interfere with orchestration.
+        """
+
+        if observer is None:
+            return
+
+        try:
+            result = observer(state)
+
+            if inspect.isawaitable(result):
+                await result
+
+        except Exception:
+            logger.exception(
+                "Orchestration state observer failed. State: %s",
+                state,
+            )
+
     async def orchestrate(
         self,
         intent: IntentResult,
         arguments: dict[str, Any] | None = None,
         selected_tool: str | None = None,
         user_confirmed: bool = False,
+        on_state_change: StateObserver | None = None,
     ) -> OrchestrationResult:
 
         # Step 1: Discover available capabilities.
@@ -99,6 +136,7 @@ class ToolOrchestrator:
             tool_name=selected_tool,
             arguments=arguments if arguments is not None else {},
             user_confirmed=user_confirmed,
+            on_state_change=on_state_change,
         )
 
         # Step 5: A failed execution cannot be reported as verified.
@@ -115,10 +153,19 @@ class ToolOrchestrator:
                 available_tools=available_tools,
                 execution=execution,
                 verification=verification,
-                message="Tool execution failed; the intended outcome was not verified.",
+                message=(
+                    "Tool execution failed; the intended outcome "
+                    "was not verified."
+                ),
             )
 
-        # Step 6: Independently verify the outcome.
+        # Step 6: Announce verification immediately before the
+        # independent verification procedure begins.
+        await self._notify_state(
+            on_state_change,
+            "verifying",
+        )
+
         verification = self.verification_engine.verify(
             execution_id=execution.execution_id,
             tool_name=execution.tool_name,
@@ -132,7 +179,10 @@ class ToolOrchestrator:
                 available_tools=available_tools,
                 execution=execution,
                 verification=verification,
-                message="Tool execution succeeded and its outcome was verified.",
+                message=(
+                    "Tool execution succeeded and its outcome "
+                    "was verified."
+                ),
             )
 
         if verification.status == VerificationStatus.FAILED:
@@ -141,7 +191,10 @@ class ToolOrchestrator:
                 available_tools=available_tools,
                 execution=execution,
                 verification=verification,
-                message="Tool execution succeeded, but the intended outcome could not be confirmed.",
+                message=(
+                    "Tool execution succeeded, but the intended "
+                    "outcome could not be confirmed."
+                ),
             )
 
         return OrchestrationResult(
@@ -149,5 +202,8 @@ class ToolOrchestrator:
             available_tools=available_tools,
             execution=execution,
             verification=verification,
-            message="Tool execution succeeded, but its outcome could not be independently verified.",
+            message=(
+                "Tool execution succeeded, but its outcome could "
+                "not be independently verified."
+            ),
         )

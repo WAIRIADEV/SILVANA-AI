@@ -5,13 +5,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
 
-from backend.app.intelligence.capability_resolver import (
-    CapabilityMatch,
-)
-from backend.app.intelligence.intent_engine import (
-    Intent,
-    IntentResult,
-)
+from backend.app.intelligence.capability_resolver import CapabilityMatch
+from backend.app.intelligence.intent_engine import Intent, IntentResult
 
 
 class ToolPlanStatus(str, Enum):
@@ -55,28 +50,33 @@ class ToolPlanner:
     }
 
     _FILE_PATTERN = re.compile(
-        r"(?<![\w.-])"
+        r"(?<![\w\.-])"
         r"(?:[A-Za-z0-9_.-]+[\\/])*"
         r"[A-Za-z0-9_.-]+\.[A-Za-z0-9]{1,10}"
-        r"(?![\w.-])"
+        r"(?![\w\.-])"
     )
 
     _GLOB_PATTERN = re.compile(
         r"(?<![\w])"
         r"(?:\*|[A-Za-z0-9_-]+)"
-        r"[A-Za-z0-9_*?.-]*"
-        r"\.[A-Za-z0-9_*?-]{1,10}"
+        r"[A-Za-z0-9_*.?-]*"
+        r"\.[A-Za-z0-9_*-]{1,10}"
     )
 
     _QUOTED_PATH_PATTERN = re.compile(
         r"""["'`](?P<path>[^"'`]+)["'`]"""
     )
 
+    # Directory segments do not accept trailing sentence punctuation.
+    # Dotted directory names remain supported.
     _DIRECTORY_PATTERN = re.compile(
         r"\b(?:in|inside|under|within|of|from)\s+"
         r"(?:(?:the|my)\s+)?"
         r"(?:(?:folder|directory)\s+)?"
-        r"(?P<path>[A-Za-z0-9_.-]+(?:[\\/][A-Za-z0-9_.-]+)*)",
+        r"(?P<path>"
+        r"[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)*"
+        r"(?:[\\/][A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)*)*"
+        r")",
         re.IGNORECASE,
     )
 
@@ -99,15 +99,25 @@ class ToolPlanner:
         "root",
     }
 
+    # These expressions describe searches inside file contents,
+    # which the current search_files capability does not support.
+    _CONTENT_SEARCH_PATTERN = re.compile(
+        r"\b(?:"
+        r"containing|contains|"
+        r"with the (?:word|text|phrase|keyword)|"
+        r"include(?:s|d)? the (?:word|text|phrase|keyword)|"
+        r"inside (?:the )?file contents?"
+        r")\b",
+        re.IGNORECASE,
+    )
+
     def plan(
         self,
         intent: IntentResult,
         user_request: str,
         available_tools: list[CapabilityMatch],
     ) -> ToolPlan:
-        """
-        Produce a tool proposal without executing it.
-        """
+        """Produce a tool proposal without executing it."""
 
         if not isinstance(intent, IntentResult):
             raise TypeError("Expected an IntentResult.")
@@ -125,15 +135,25 @@ class ToolPlanner:
                 "This request does not require a supported filesystem tool."
             )
 
-        tool_name = self._select_tool(
-            intent.matched_rule,
-            user_request,
-        )
-
         if intent.matched_rule == "explicit_action":
             return self._unsupported(
                 "That action is not supported by SILVANA's current filesystem capabilities."
             )
+
+        if (
+            intent.matched_rule == "filesystem_search"
+            and self._CONTENT_SEARCH_PATTERN.search(user_request)
+        ):
+            return self._unsupported(
+                "The current search capability matches filenames, "
+                "not text inside file contents. Content search is not "
+                "available yet."
+            )
+
+        tool_name = self._select_tool(
+            intent.matched_rule,
+            user_request,
+        )
 
         if tool_name is None:
             return self._unsupported(
@@ -193,10 +213,23 @@ class ToolPlanner:
         if matched_rule == "filesystem_search":
             normalized = request.lower()
 
-            if re.search(
-                r"\b(list|show|display)\b",
-                normalized,
-            ):
+            # Search intent takes priority over words such as "show"
+            # when the user wants matching files or search results.
+            search_cues = (
+                r"\b(search|find|look for|locate|matching|"
+                r"containing|contains|named|called)\b"
+            )
+
+            if re.search(search_cues, normalized):
+                return "search_files"
+
+            # A listing request describes directory contents.
+            listing_cues = (
+                r"\b(list|show|display)\b.*"
+                r"\b(contents?|files?|folders?|directories|items?)\b"
+            )
+
+            if re.search(listing_cues, normalized):
                 return "list_directory"
 
             return "search_files"
@@ -315,13 +348,8 @@ class ToolPlanner:
         self,
         request: str,
     ) -> str | None:
-        quoted_match = self._QUOTED_PATH_PATTERN.search(request)
-
-        if quoted_match:
-            target = quoted_match.group("path").strip()
-
-            if target and target.lower() not in self._WORKSPACE_WORDS:
-                return target
+        # Quoted text is not automatically a directory.
+        # It may be a search term, filename, or other user-provided value.
 
         file_match = self._FILE_PATTERN.search(request)
 

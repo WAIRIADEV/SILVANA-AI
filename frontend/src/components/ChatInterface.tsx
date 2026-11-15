@@ -2,8 +2,9 @@
 import { useEffect, useRef, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { sendChatMessage } from '../services/api/chat'
+import { sendStreamingChatMessage } from '../services/api/chat'
 import type { ChatMessage, ChatResponse } from '../types/api'
+import type { AssistantState } from '../types/assistant'
 import './ChatInterface.css'
 
 interface DisplayMessage extends ChatMessage {
@@ -11,7 +12,11 @@ interface DisplayMessage extends ChatMessage {
   metadata?: Pick<ChatResponse, 'provider' | 'model'>
 }
 
-function ChatInterface() {
+interface ChatInterfaceProps {
+  onStateChange: (state: AssistantState) => void
+}
+
+function ChatInterface({ onStateChange }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<DisplayMessage[]>([])
   const [input, setInput] = useState('')
   const [isSending, setIsSending] = useState(false)
@@ -50,17 +55,21 @@ function ChatInterface() {
 
     setError(null)
     setIsSending(true)
+    onStateChange('thinking')
 
     try {
-      const response = await sendChatMessage({
-        messages: conversation.slice(-50).map(({ role, content }) => ({
-          role,
-          content,
-        })),
-        provider: 'groq',
-        temperature: 0.7,
-        max_output_tokens: 1024,
-      })
+      const response = await sendStreamingChatMessage(
+        {
+          messages: conversation.slice(-50).map(({ role, content }) => ({
+            role,
+            content,
+          })),
+          provider: 'groq',
+          temperature: 0.7,
+          max_output_tokens: 1024,
+        },
+        onStateChange,
+      )
 
       const assistantMessage: DisplayMessage = {
         id: crypto.randomUUID(),
@@ -80,6 +89,8 @@ function ChatInterface() {
           ? err.message
           : 'SILVANA could not complete the request.',
       )
+
+      onStateChange('error')
     } finally {
       setIsSending(false)
       textareaRef.current?.focus()
@@ -101,6 +112,14 @@ function ChatInterface() {
     }
   }
 
+  function handleInputChange(value: string) {
+    setInput(value)
+
+    if (isSending) return
+
+    onStateChange(value.trim() ? 'listening' : 'idle')
+  }
+
   function retryLastMessage() {
     const lastUserMessage = [...messages]
       .reverse()
@@ -118,6 +137,7 @@ function ChatInterface() {
     setInput('')
     setError(null)
     setLastResponse(null)
+    onStateChange('idle')
 
     textareaRef.current?.focus()
   }
@@ -145,7 +165,7 @@ function ChatInterface() {
           onClick={clearConversation}
           disabled={!hasMessages || isSending}
         >
-          <span aria-hidden="true">â†º</span>
+          <span aria-hidden="true">↻</span>
           CLEAR
         </button>
       </div>
@@ -157,7 +177,7 @@ function ChatInterface() {
       >
         {!hasMessages && (
           <div className="conversation-empty">
-            <div className="empty-symbol">â—ˆ</div>
+            <div className="empty-symbol">◇</div>
 
             <h3>READY WHEN YOU ARE</h3>
 
@@ -250,7 +270,7 @@ function ChatInterface() {
           <textarea
             ref={textareaRef}
             value={input}
-            onChange={(event) => setInput(event.target.value)}
+            onChange={(event) => handleInputChange(event.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Message SILVANA..."
             rows={2}
@@ -265,7 +285,7 @@ function ChatInterface() {
             disabled={!input.trim() || isSending}
             aria-label="Send message"
           >
-            {isSending ? '...' : 'SEND â†—'}
+            {isSending ? '...' : 'SEND →'}
           </button>
         </div>
 

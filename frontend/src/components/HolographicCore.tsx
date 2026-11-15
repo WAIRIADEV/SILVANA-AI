@@ -2,10 +2,21 @@
 import { useEffect, useRef } from 'react'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
+import type { AssistantState } from '../types/assistant'
+import { ASSISTANT_STATES } from '../types/assistant'
 import './HolographicCore.css'
 
-function HolographicCore() {
+interface HolographicCoreProps {
+  state: AssistantState
+}
+
+function HolographicCore({ state }: HolographicCoreProps) {
   const containerRef = useRef<HTMLDivElement>(null)
+  const stateRef = useRef(state)
+
+  useEffect(() => {
+    stateRef.current = state
+  }, [state])
 
   useEffect(() => {
     const containerElement = containerRef.current
@@ -13,15 +24,10 @@ function HolographicCore() {
 
     const container = containerElement
 
-    // Track component lifecycle and animation resources.
     let disposed = false
     let frameId = 0
     let resizeObserver: ResizeObserver | null = null
     let mixer: THREE.AnimationMixer | null = null
-
-    // --------------------------------------------------
-    // 1. SCENE AND CAMERA
-    // --------------------------------------------------
 
     const scene = new THREE.Scene()
 
@@ -41,7 +47,6 @@ function HolographicCore() {
       return
     }
 
-    // Limit rendering resolution to protect lower-powered hardware.
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.25))
 
     renderer.setSize(
@@ -58,36 +63,20 @@ function HolographicCore() {
 
     container.appendChild(canvas)
 
-    // --------------------------------------------------
-    // 2. CAMERA CONTROLS
-    // --------------------------------------------------
-
     const controls = new OrbitControls(camera, canvas)
 
     controls.target.set(0, 0, 0)
-
     controls.enableDamping = true
     controls.dampingFactor = 0.06
-
-    // Mouse wheel zoom.
     controls.enableZoom = true
     controls.zoomSpeed = 0.8
     controls.minDistance = 4.1
     controls.maxDistance = 8
-
-    // Mouse drag rotation.
     controls.enableRotate = true
     controls.rotateSpeed = 0.65
-
-    // Prevent accidental camera panning.
     controls.enablePan = false
-
-    // Restrict vertical camera movement.
     controls.minPolarAngle = Math.PI * 0.22
     controls.maxPolarAngle = Math.PI * 0.78
-
-    // Enable automatic camera rotation.
-    // This is intentionally independent of the OS reduced-motion setting.
     controls.autoRotate = true
     controls.autoRotateSpeed = 0.4
 
@@ -99,16 +88,10 @@ function HolographicCore() {
 
     controls.addEventListener('change', renderScene)
 
-    // --------------------------------------------------
-    // 3. HOLOGRAM CONTAINER
-    // --------------------------------------------------
-
     const hologram = new THREE.Group()
     hologram.position.y = -0.05
-
     scene.add(hologram)
 
-    // Track resources to ensure everything is disposed properly.
     const ownedMaterials = new Set<THREE.Material>()
     const ownedGeometries = new Set<THREE.BufferGeometry>()
 
@@ -132,30 +115,25 @@ function HolographicCore() {
       })
     }
 
-    // --------------------------------------------------
-    // 4. INDEPENDENT ORBITAL ENERGY SYSTEM
-    // --------------------------------------------------
+    // STATE-DRIVEN ORBITAL ENERGY SYSTEM
 
     const orbitalGroup = new THREE.Group()
     scene.add(orbitalGroup)
 
-    // Separate parent groups allow each ring to rotate independently.
     const waistOrbit = new THREE.Group()
     const upperOrbit = new THREE.Group()
 
     orbitalGroup.add(waistOrbit, upperOrbit)
 
-    // Purple energy ring.
     const waistMaterial = new THREE.MeshBasicMaterial({
-      color: 0x8c63ff,
+      color: 0x22d3ee,
       transparent: true,
       opacity: 0.58,
       depthWrite: false,
     })
 
-    // Cyan energy ring.
     const upperMaterial = new THREE.MeshBasicMaterial({
-      color: 0x42dfff,
+      color: 0x22d3ee,
       transparent: true,
       opacity: 0.5,
       depthWrite: false,
@@ -171,7 +149,6 @@ function HolographicCore() {
 
     waistRing.position.y = -0.1
     waistRing.rotation.x = Math.PI / 2
-
     waistOrbit.add(waistRing)
 
     const upperRing = new THREE.Mesh(
@@ -181,12 +158,9 @@ function HolographicCore() {
 
     upperRing.position.y = 0.8
     upperRing.rotation.x = Math.PI / 2.4
-
     upperOrbit.add(upperRing)
 
-    // --------------------------------------------------
-    // 5. FLOATING PARTICLES
-    // --------------------------------------------------
+    // FLOATING PARTICLES
 
     const particleCount = 100
     const positions = new Float32Array(particleCount * 3)
@@ -210,7 +184,7 @@ function HolographicCore() {
     ownedGeometries.add(particleGeometry)
 
     const particleMaterial = new THREE.PointsMaterial({
-      color: 0x65dcff,
+      color: 0x22d3ee,
       size: 0.018,
       transparent: true,
       opacity: 0.65,
@@ -227,15 +201,13 @@ function HolographicCore() {
 
     scene.add(particles)
 
-    // --------------------------------------------------
-    // 6. FEMALE HOLOGRAPHIC MODEL
-    // --------------------------------------------------
+    // HOLOGRAPHIC HUMANOID
 
     const modelPivot = new THREE.Group()
     hologram.add(modelPivot)
 
     const hologramMaterial = new THREE.MeshBasicMaterial({
-      color: 0x42dfff,
+      color: 0x22d3ee,
       wireframe: true,
       transparent: true,
       opacity: 0.78,
@@ -266,7 +238,6 @@ function HolographicCore() {
 
         const model = gltf.scene
 
-        // Apply the holographic material to the entire model.
         model.traverse((object) => {
           if (!(object instanceof THREE.Mesh)) return
 
@@ -279,7 +250,6 @@ function HolographicCore() {
           }
         })
 
-        // Calculate model dimensions and center it.
         const bounds = new THREE.Box3().setFromObject(model)
         const size = bounds.getSize(new THREE.Vector3())
         const center = bounds.getCenter(new THREE.Vector3())
@@ -301,7 +271,6 @@ function HolographicCore() {
 
         modelPivot.add(model)
 
-        // If the GLB contains animation clips, use an idle-compatible clip.
         if (gltf.animations.length > 0) {
           mixer = new THREE.AnimationMixer(model)
 
@@ -334,9 +303,7 @@ function HolographicCore() {
       }
     }
 
-    // --------------------------------------------------
-    // 7. RESPONSIVE VIEWPORT
-    // --------------------------------------------------
+    // RESPONSIVE VIEWPORT
 
     function resize() {
       const width = container.clientWidth
@@ -355,9 +322,29 @@ function HolographicCore() {
     resizeObserver = new ResizeObserver(resize)
     resizeObserver.observe(container)
 
-    // --------------------------------------------------
-    // 8. IDLE AND ORBITAL ANIMATION
-    // --------------------------------------------------
+    // STATE TRANSITION TRACKING
+
+    const activeColor = new THREE.Color()
+    const targetColor = new THREE.Color()
+
+    let activeState: AssistantState = stateRef.current
+
+    function applyAssistantState(nextState: AssistantState) {
+      if (nextState === activeState) return
+
+      activeState = nextState
+
+      const config = ASSISTANT_STATES[nextState]
+
+      targetColor.setHex(config.color)
+
+      console.info(`SILVANA: Assistant state changed to ${nextState}.`)
+    }
+
+    targetColor.setHex(ASSISTANT_STATES[activeState].color)
+    activeColor.copy(targetColor)
+
+    // ANIMATION LOOP
 
     const timer = new THREE.Timer()
 
@@ -377,15 +364,29 @@ function HolographicCore() {
 
       elapsed += delta
 
-      // Ambient animations intentionally remain enabled.
-      // They are not disabled by the operating system preference.
+      applyAssistantState(stateRef.current)
 
-      // GENTLE HOLOGRAM FLOATING
-      hologram.position.y =
-        -0.05 + Math.sin(elapsed * 0.85) * 0.035
+      // Smooth colour transitions instead of abrupt colour changes.
+      activeColor.lerp(targetColor, 1 - Math.exp(-delta * 3.5))
 
-      // SUBTLE BREATHING EFFECT
-      const breathing = 1 + Math.sin(elapsed * 1.1) * 0.009
+      hologramMaterial.color.copy(activeColor)
+      waistMaterial.color.copy(activeColor)
+      upperMaterial.color.copy(activeColor)
+      particleMaterial.color.copy(activeColor)
+
+      // State-dependent intensity.
+      const pulseSpeed =
+        activeState === 'thinking' ? 2.8 :
+        activeState === 'executing' ? 4.2 :
+        activeState === 'verifying' ? 1.8 :
+        activeState === 'error' ? 3.5 : 1.1
+
+      const pulseStrength =
+        activeState === 'idle' ? 0.009 :
+        activeState === 'completed' ? 0.014 : 0.025
+
+      const breathing =
+        1 + Math.sin(elapsed * pulseSpeed) * pulseStrength
 
       modelPivot.scale.setScalar(breathing)
 
@@ -396,40 +397,38 @@ function HolographicCore() {
       modelPivot.rotation.x =
         Math.sin(elapsed * 0.45) * 0.008
 
-      // PURPLE WAIST RING
-      // Steady clockwise rotation with a gentle orbital tilt.
-      waistOrbit.rotation.y += delta * 0.65
+      // ORBITAL ENERGY SYSTEM
+      const orbitSpeed =
+        activeState === 'thinking' ? 1.2 :
+        activeState === 'executing' ? 1.8 :
+        activeState === 'verifying' ? 0.45 : 0.65
+
+      waistOrbit.rotation.y += delta * orbitSpeed
 
       waistOrbit.rotation.z =
         Math.sin(elapsed * 0.7) * 0.2
 
-      // CYAN UPPER RING
-      // Faster counter-clockwise rotation on an independent axis.
-      upperOrbit.rotation.y -= delta * 1.0
+      upperOrbit.rotation.y -= delta * orbitSpeed * 1.5
 
       upperOrbit.rotation.x =
         Math.sin(elapsed * 0.9) * 0.25
 
       upperOrbit.rotation.z += delta * 0.25
 
-      // AMBIENT PARTICLE MOVEMENT
-      particles.rotation.y += delta * 0.025
+      // PARTICLES
+      particles.rotation.y += delta * (
+        activeState === 'thinking' ? 0.055 : 0.025
+      )
 
       particles.rotation.x =
         Math.sin(elapsed * 0.3) * 0.04
 
-      // PLAY SKELETAL ANIMATION IF AVAILABLE.
       mixer?.update(delta)
 
-      // Update camera damping and automatic rotation.
       controls.update()
 
       renderer.render(scene, camera)
     }
-
-    // --------------------------------------------------
-    // 9. ANIMATION LIFECYCLE
-    // --------------------------------------------------
 
     function startAnimation() {
       if (
@@ -452,7 +451,6 @@ function HolographicCore() {
       }
     }
 
-    // Pause rendering when the browser tab is hidden.
     function handleVisibilityChange() {
       if (document.hidden) {
         stopAnimation()
@@ -471,9 +469,7 @@ function HolographicCore() {
 
     startAnimation()
 
-    // --------------------------------------------------
-    // 10. RESOURCE CLEANUP
-    // --------------------------------------------------
+    // RESOURCE CLEANUP
 
     return () => {
       disposed = true

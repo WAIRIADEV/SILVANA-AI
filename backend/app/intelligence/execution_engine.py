@@ -4,8 +4,10 @@ import logging
 import time
 import uuid
 
+
 from dataclasses import dataclass
-from typing import Any
+from enum import Enum
+from typing import Any, Awaitable, Callable
 
 from backend.app.intelligence.tool_registry import ToolRegistry
 from backend.app.intelligence.tool_security import (
@@ -16,6 +18,18 @@ from backend.app.intelligence.tool_security import (
 
 
 logger = logging.getLogger(__name__)
+
+StateObserver = Callable[
+    [str],
+    Awaitable[None] | None,
+]
+
+
+class ExecutionStatus(str, Enum):
+    PENDING = "pending"
+    EXECUTING = "executing"
+    COMPLETED = "completed"
+    FAILED = "failed"
 
 
 @dataclass
@@ -41,8 +55,9 @@ class ExecutionEngine:
     1. Retrieve the registered tool.
     2. Check authorization.
     3. Validate arguments.
-    4. Invoke the registered handler.
-    5. Return a structured execution result.
+    4. Notify observers that execution is beginning.
+    5. Invoke the registered handler.
+    6. Return a structured execution result.
     """
 
     def __init__(
@@ -53,11 +68,37 @@ class ExecutionEngine:
         self.registry = registry
         self.security_manager = security_manager
 
+    async def _notify_state(
+        self,
+        observer: StateObserver | None,
+        state: str,
+    ) -> None:
+        """
+        Notify an optional observer without allowing monitoring
+        failures to interfere with tool execution.
+        """
+
+        if observer is None:
+            return
+
+        try:
+            result = observer(state)
+
+            if inspect.isawaitable(result):
+                await result
+
+        except Exception:
+            logger.exception(
+                "Execution state observer failed. State: %s",
+                state,
+            )
+
     async def execute(
         self,
         tool_name: str,
         arguments: dict[str, Any],
         user_confirmed: bool = False,
+        on_state_change: StateObserver | None = None,
     ) -> ExecutionResult:
 
         execution_id = str(uuid.uuid4())
@@ -139,7 +180,13 @@ class ExecutionEngine:
                 error=str(error),
             )
 
-        # Step 4: Execute the registered handler.
+        # Step 4: Notify observers only after all security checks.
+        await self._notify_state(
+            on_state_change,
+            "executing",
+        )
+
+        # Step 5: Execute the registered handler.
         try:
             handler_result = tool.handler(
                 **validated_arguments
@@ -160,7 +207,7 @@ class ExecutionEngine:
                 error="Tool execution failed.",
             )
 
-        # Step 5: Return the successful result.
+        # Step 6: Return the successful result.
         logger.info(
             "Tool execution completed. "
             "Tool: %s | ID: %s",

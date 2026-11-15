@@ -295,3 +295,79 @@ def test_invalid_intent_type_raises_error(planner, available_tools):
             "Does settings.json exist?",
             available_tools,
         )
+
+def test_search_with_quoted_content_term_is_not_directory_listing(
+    planner,
+    available_tools,
+):
+    result = planner.plan(
+        make_intent("filesystem_search"),
+        "Search my workspace for Python files containing the word 'ExecutionEngine'.",
+        available_tools,
+    )
+
+    assert result.status == ToolPlanStatus.UNSUPPORTED
+    assert result.tool_name is None
+    assert "file contents" in result.message
+
+
+def test_show_matching_file_paths_remains_a_search(
+    planner,
+    available_tools,
+):
+    result = planner.plan(
+        make_intent("filesystem_search"),
+        "Find all Python files. Show me the matching file paths.",
+        available_tools,
+    )
+
+    assert result.status == ToolPlanStatus.READY
+    assert result.tool_name == "search_files"
+    assert result.arguments["pattern"] == "*.py"
+
+
+def test_workspace_with_trailing_punctuation_uses_root(
+    planner,
+    available_tools,
+):
+    result = planner.plan(
+        make_intent("filesystem_search"),
+        "Find all Python files in my workspace. Return their relative paths.",
+        available_tools,
+    )
+
+    assert result.status == ToolPlanStatus.READY
+    assert result.tool_name == "search_files"
+    assert result.arguments["pattern"] == "*.py"
+    assert "directory" not in result.arguments
+
+
+def test_search_in_workspace_does_not_use_quoted_term_as_directory(
+    planner,
+    available_tools,
+):
+    result = planner.plan(
+        make_intent("filesystem_search"),
+        "Find files named 'ExecutionEngine.py' in my workspace.",
+        available_tools,
+    )
+
+    assert result.status == ToolPlanStatus.READY
+    assert result.tool_name == "search_files"
+    assert result.arguments["pattern"] == "ExecutionEngine.py"
+    assert "directory" not in result.arguments
+
+
+def test_show_folder_contents_still_lists_directory(
+    planner,
+    available_tools,
+):
+    result = planner.plan(
+        make_intent("filesystem_search"),
+        "Show folder contents in src",
+        available_tools,
+    )
+
+    assert result.status == ToolPlanStatus.READY
+    assert result.tool_name == "list_directory"
+    assert result.arguments["path"] == "src"

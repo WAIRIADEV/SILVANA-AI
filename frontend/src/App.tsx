@@ -4,6 +4,8 @@ import './App.css'
 import { useBackendHealth } from './hooks/useBackendHealth'
 import HolographicCore from './components/HolographicCore'
 import ChatInterface from './components/ChatInterface'
+import { ASSISTANT_STATES } from './types/assistant'
+import useAssistantState from './hooks/useAssistantState'
 
 type ExplorerSection =
   | 'intelligence'
@@ -13,8 +15,16 @@ type ExplorerSection =
 
 function App() {
   const backendHealth = useBackendHealth()
+
   const [activeSection, setActiveSection] =
     useState<ExplorerSection>('intelligence')
+
+  const {
+    state: assistantState,
+    transitionTo: setAssistantState,
+  } = useAssistantState()
+
+  const currentState = ASSISTANT_STATES[assistantState]
 
   const backendStatus =
     backendHealth.status === 'operational'
@@ -73,6 +83,20 @@ function App() {
               <p>
                 Operational status of the SILVANA intelligence system.
               </p>
+            </div>
+
+            <div className="status-card">
+              <div className="status-card-heading">
+                <span>ASSISTANT STATE</span>
+                <span
+                  className="status-indicator"
+                  style={{ backgroundColor: currentState.cssColor }}
+                />
+              </div>
+              <strong style={{ color: currentState.cssColor }}>
+                {currentState.label}
+              </strong>
+              <p>{currentState.description}</p>
             </div>
 
             <div className="status-card">
@@ -229,7 +253,7 @@ function App() {
             <div className="scanner-ring ring-three" />
             <div className="vertical-beam" />
 
-            <HolographicCore />
+            <HolographicCore state={assistantState} />
 
             <div className="scan-line" />
           </div>
@@ -237,14 +261,14 @@ function App() {
           <div className="observation-message">
             <div className="message-overline">
               <span />
-              PERCEPTION SYSTEM ENGAGED
+              {currentState.label}
               <span />
             </div>
 
             <h1>SILVANA</h1>
 
             <p>
-              OBSERVING ENVIRONMENT <span>/</span> AWAITING INPUT
+              {currentState.description.toUpperCase()}
             </p>
           </div>
 
@@ -252,12 +276,22 @@ function App() {
             <span className="readout-label">ENTITY</span>
             <span className="readout-value">SILVANA_01</span>
             <span className="readout-label">MODE</span>
-            <span className="readout-value cyan">OBSERVATION</span>
+            <span
+              className="readout-value"
+              style={{ color: currentState.cssColor }}
+            >
+              {currentState.label}
+            </span>
           </div>
 
           <div className="side-readout readout-right">
             <span className="readout-label">CORE STATUS</span>
-            <span className="readout-value cyan">ACTIVE</span>
+            <span
+              className="readout-value"
+              style={{ color: currentState.cssColor }}
+            >
+              {currentState.label}
+            </span>
             <span className="readout-label">RENDER ENGINE</span>
             <span className="readout-value">THREE.JS</span>
           </div>
@@ -274,7 +308,7 @@ function App() {
         </section>
 
         <section className="interaction-panel">
-          <ChatInterface />
+          <ChatInterface onStateChange={setAssistantState} />
         </section>
 
         <aside className="explorer-panel">

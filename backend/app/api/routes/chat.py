@@ -1,7 +1,12 @@
 
+import asyncio
+import json
 import logging
 
+from typing import Any, Awaitable, Callable
+
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
 
 from backend.app.api.dependencies import (
     get_provider_manager,
@@ -23,7 +28,10 @@ from backend.app.intelligence.errors import (
 )
 from backend.app.intelligence.provider_manager import ProviderManager
 from backend.app.intelligence.response_engine import ResponseEngine
-from backend.app.intelligence.tool_orchestrator import ToolOrchestrator
+from backend.app.intelligence.tool_orchestrator import (
+    OrchestrationStatus,
+    ToolOrchestrator,
+)
 from backend.app.intelligence.tool_planner import (
     ToolPlanStatus,
     ToolPlanner,
@@ -38,14 +46,42 @@ context_analyzer = ConversationContextAnalyzer()
 intent_engine = IntentEngine()
 response_engine = ResponseEngine()
 
+StateObserver = Callable[
+    [str],
+    Awaitable[None] | None,
+]
 
-@router.post("/chat", response_model=ChatResponse)
-async def create_chat_completion(
+
+async def notify_state(
+    observer: StateObserver | None,
+    state: str,
+) -> None:
+    """Notify an optional observer without affecting request handling."""
+
+    if observer is None:
+        return
+
+    try:
+        result = observer(state)
+
+        if asyncio.iscoroutine(result):
+            await result
+
+    except Exception:
+        logger.exception(
+            "Chat state observer failed. State: %s",
+            state,
+        )
+
+
+async def process_chat_request(
     request: ChatRequest,
-    manager: ProviderManager = Depends(get_provider_manager),
-    orchestrator: ToolOrchestrator = Depends(get_tool_orchestrator),
-    planner: ToolPlanner = Depends(get_tool_planner),
-):
+    manager: ProviderManager,
+    orchestrator: ToolOrchestrator,
+    planner: ToolPlanner,
+    on_state_change: StateObserver | None = None,
+) -> ChatResponse:
+
     # Convert the incoming conversation into internal messages.
     conversation_messages = [
         ChatMessage(
@@ -106,6 +142,8 @@ async def create_chat_completion(
 
         # Ask for clarification when the request is ambiguous.
         if plan.status == ToolPlanStatus.CLARIFICATION_REQUIRED:
+            await notify_state(on_state_change, "completed")
+
             return ChatResponse(
                 content=plan.message,
                 provider="internal",
@@ -114,6 +152,8 @@ async def create_chat_completion(
 
         # Do not silently send unsupported actions to an LLM.
         if plan.status == ToolPlanStatus.UNSUPPORTED:
+            await notify_state(on_state_change, "completed")
+
             return ChatResponse(
                 content=plan.message,
                 provider="internal",
@@ -133,17 +173,25 @@ async def create_chat_completion(
             )
 
         # Execute the selected capability through the orchestrator.
-        # The orchestrator performs its own capability validation,
-        # security checks, execution, and independent verification.
         orchestration_result = await orchestrator.orchestrate(
             intent=intent_result,
             arguments=plan.arguments,
             selected_tool=plan.tool_name,
             user_confirmed=False,
+            on_state_change=on_state_change,
         )
 
         # Convert the verified orchestration outcome into a response.
         response = response_engine.generate(orchestration_result)
+
+        # A tool operation is complete only when independently verified.
+        if (
+            getattr(orchestration_result, "status", None)
+            == OrchestrationStatus.VERIFICATION_SUCCEEDED
+        ):
+            await notify_state(on_state_change, "completed")
+        else:
+            await notify_state(on_state_change, "error")
 
         return ChatResponse(
             content=response.content,
@@ -256,6 +304,8 @@ async def create_chat_completion(
             detail="The AI provider failed to complete the request.",
         )
 
+    await notify_state(on_state_change, "completed")
+
     # Return a consistent structured response.
     return ChatResponse(
         content=result.content,
@@ -264,4 +314,136 @@ async def create_chat_completion(
         input_tokens=result.input_tokens,
         output_tokens=result.output_tokens,
         finish_reason=result.finish_reason,
+    )
+
+
+@router.post("/chat", response_model=ChatResponse)
+async def create_chat_completion(
+    request: ChatRequest,
+    manager: ProviderManager = Depends(get_provider_manager),
+    orchestrator: ToolOrchestrator = Depends(get_tool_orchestrator),
+    planner: ToolPlanner = Depends(get_tool_planner),
+):
+    """
+    Standard JSON chat endpoint.
+
+    Retained for compatibility with existing clients.
+    """
+
+    return await process_chat_request(
+        request=request,
+        manager=manager,
+        orchestrator=orchestrator,
+        planner=planner,
+    )
+
+
+@router.post("/chat/stream")
+async def create_chat_completion_stream(
+    request: ChatRequest,
+    manager: ProviderManager = Depends(get_provider_manager),
+    orchestrator: ToolOrchestrator = Depends(get_tool_orchestrator),
+    planner: ToolPlanner = Depends(get_tool_planner),
+):
+    """
+    Server-Sent Events endpoint for live assistant state updates.
+    """
+
+    async def event_stream():
+
+        queue: asyncio.Queue[
+            tuple[str, dict[str, Any]] | None
+        ] = asyncio.Queue()
+
+        async def publish_state(state: str) -> None:
+            await queue.put(
+                (
+                    "state",
+                    {"state": state},
+                )
+            )
+
+        async def produce_response() -> None:
+            try:
+                response = await process_chat_request(
+                    request=request,
+                    manager=manager,
+                    orchestrator=orchestrator,
+                    planner=planner,
+                    on_state_change=publish_state,
+                )
+
+                await queue.put(
+                    (
+                        "response",
+                        response.model_dump(),
+                    )
+                )
+
+            except HTTPException as error:
+                await publish_state("error")
+
+                await queue.put(
+                    (
+                        "error",
+                        {
+                            "detail": error.detail,
+                            "status_code": error.status_code,
+                        },
+                    )
+                )
+
+            except Exception:
+                logger.exception(
+                    "Unexpected failure while streaming chat response."
+                )
+
+                await publish_state("error")
+
+                await queue.put(
+                    (
+                        "error",
+                        {
+                            "detail": (
+                                "SILVANA could not complete the request."
+                            )
+                        },
+                    )
+                )
+
+            finally:
+                await queue.put(None)
+
+        producer_task = asyncio.create_task(produce_response())
+
+        try:
+            while True:
+                item = await queue.get()
+
+                if item is None:
+                    break
+
+                event_name, payload = item
+
+                yield (
+                    f"event: {event_name}\n"
+                    f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
+                )
+
+        finally:
+            if not producer_task.done():
+                producer_task.cancel()
+
+                try:
+                    await producer_task
+                except asyncio.CancelledError:
+                    pass
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+        },
     )
