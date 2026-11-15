@@ -4,6 +4,8 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from backend.app.api.router import api_router
+from backend.app.core.config import settings
+
 from backend.app.intelligence.provider_manager import ProviderManager
 from backend.app.intelligence.tool_registry import ToolRegistry
 from backend.app.intelligence.tool_security import ToolSecurityManager
@@ -11,6 +13,12 @@ from backend.app.intelligence.capability_resolver import CapabilityResolver
 from backend.app.intelligence.execution_engine import ExecutionEngine
 from backend.app.intelligence.tool_orchestrator import ToolOrchestrator
 from backend.app.intelligence.verification_engine import VerificationEngine
+
+from backend.app.intelligence.filesystem.workspace import WorkspaceBoundary
+from backend.app.intelligence.filesystem.service import FilesystemService
+from backend.app.intelligence.filesystem.registration import (
+    register_filesystem_tools,
+)
 
 
 @asynccontextmanager
@@ -26,6 +34,26 @@ async def lifespan(app: FastAPI):
         granted_permissions={"read"}
     )
 
+    # Initialize independent outcome verification.
+    app.state.verification_engine = VerificationEngine()
+
+    # Establish the permitted filesystem workspace.
+    app.state.workspace_boundary = WorkspaceBoundary(
+        settings.SILVANA_WORKSPACE_ROOT
+    )
+
+    # Initialize the bounded filesystem service.
+    app.state.filesystem_service = FilesystemService(
+        app.state.workspace_boundary
+    )
+
+    # Register read-only filesystem capabilities and verifiers.
+    register_filesystem_tools(
+        registry=app.state.tool_registry,
+        verification_engine=app.state.verification_engine,
+        service=app.state.filesystem_service,
+    )
+
     # Initialize capability discovery.
     app.state.capability_resolver = CapabilityResolver(
         registry=app.state.tool_registry
@@ -36,9 +64,6 @@ async def lifespan(app: FastAPI):
         registry=app.state.tool_registry,
         security_manager=app.state.tool_security,
     )
-
-    # Initialize independent outcome verification.
-    app.state.verification_engine = VerificationEngine()
 
     # Initialize the orchestration layer.
     app.state.tool_orchestrator = ToolOrchestrator(

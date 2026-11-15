@@ -2,6 +2,7 @@
 from fastapi.testclient import TestClient
 
 from backend.app.main import app
+from backend.app.core.config import settings
 from backend.app.api.dependencies import (
     get_provider_manager,
     get_tool_orchestrator,
@@ -14,6 +15,8 @@ from backend.app.intelligence.tool_orchestrator import ToolOrchestrator
 from backend.app.intelligence.tool_registry import ToolRegistry
 from backend.app.intelligence.tool_security import ToolSecurityManager
 from backend.app.intelligence.verification_engine import VerificationEngine
+from backend.app.intelligence.filesystem.workspace import WorkspaceBoundary
+from backend.app.intelligence.filesystem.service import FilesystemService
 
 
 class FakeProviderManager:
@@ -24,13 +27,19 @@ class FakeProviderManager:
         self.closed = True
 
 
-def test_application_initializes_intelligence_components(monkeypatch):
+def create_fake_provider(monkeypatch):
     fake_manager = FakeProviderManager()
 
     monkeypatch.setattr(
         "backend.app.main.ProviderManager",
         lambda: fake_manager,
     )
+
+    return fake_manager
+
+
+def test_application_initializes_intelligence_components(monkeypatch):
+    fake_manager = create_fake_provider(monkeypatch)
 
     with TestClient(app):
         assert app.state.provider_manager is fake_manager
@@ -46,12 +55,7 @@ def test_application_initializes_intelligence_components(monkeypatch):
 
 
 def test_intelligence_components_share_correct_dependencies(monkeypatch):
-    fake_manager = FakeProviderManager()
-
-    monkeypatch.setattr(
-        "backend.app.main.ProviderManager",
-        lambda: fake_manager,
-    )
+    create_fake_provider(monkeypatch)
 
     with TestClient(app):
         registry = app.state.tool_registry
@@ -72,12 +76,7 @@ def test_intelligence_components_share_correct_dependencies(monkeypatch):
 
 
 def test_dependencies_return_application_shared_instances(monkeypatch):
-    fake_manager = FakeProviderManager()
-
-    monkeypatch.setattr(
-        "backend.app.main.ProviderManager",
-        lambda: fake_manager,
-    )
+    create_fake_provider(monkeypatch)
 
     with TestClient(app):
         request = type(
@@ -100,12 +99,7 @@ def test_dependencies_return_application_shared_instances(monkeypatch):
 
 
 def test_application_closes_provider_manager_on_shutdown(monkeypatch):
-    fake_manager = FakeProviderManager()
-
-    monkeypatch.setattr(
-        "backend.app.main.ProviderManager",
-        lambda: fake_manager,
-    )
+    fake_manager = create_fake_provider(monkeypatch)
 
     with TestClient(app):
         assert fake_manager.closed is False
@@ -114,12 +108,7 @@ def test_application_closes_provider_manager_on_shutdown(monkeypatch):
 
 
 def test_application_initializes_verification_engine(monkeypatch):
-    fake_manager = FakeProviderManager()
-
-    monkeypatch.setattr(
-        "backend.app.main.ProviderManager",
-        lambda: fake_manager,
-    )
+    create_fake_provider(monkeypatch)
 
     with TestClient(app):
         assert isinstance(
@@ -129,12 +118,7 @@ def test_application_initializes_verification_engine(monkeypatch):
 
 
 def test_verification_dependency_returns_shared_instance(monkeypatch):
-    fake_manager = FakeProviderManager()
-
-    monkeypatch.setattr(
-        "backend.app.main.ProviderManager",
-        lambda: fake_manager,
-    )
+    create_fake_provider(monkeypatch)
 
     with TestClient(app):
         request = type(
@@ -147,3 +131,80 @@ def test_verification_dependency_returns_shared_instance(monkeypatch):
             get_verification_engine(request)
             is app.state.verification_engine
         )
+
+
+# FILESYSTEM STARTUP INTEGRATION
+
+
+def test_application_initializes_filesystem_components(monkeypatch):
+    create_fake_provider(monkeypatch)
+
+    with TestClient(app):
+        assert isinstance(
+            app.state.workspace_boundary,
+            WorkspaceBoundary,
+        )
+
+        assert isinstance(
+            app.state.filesystem_service,
+            FilesystemService,
+        )
+
+        assert (
+            app.state.filesystem_service.boundary
+            is app.state.workspace_boundary
+        )
+
+        assert (
+            app.state.workspace_boundary.root
+            == settings.SILVANA_WORKSPACE_ROOT.resolve()
+        )
+
+
+def test_application_registers_all_filesystem_tools(monkeypatch):
+    create_fake_provider(monkeypatch)
+
+    expected_tools = {
+        "list_directory",
+        "search_files",
+        "get_file_metadata",
+        "check_file_exists",
+    }
+
+    with TestClient(app):
+        registered_tools = {
+            tool.name
+            for tool in app.state.tool_registry.list_tools()
+        }
+
+        assert registered_tools == expected_tools
+
+
+def test_filesystem_tools_have_read_only_permissions(monkeypatch):
+    create_fake_provider(monkeypatch)
+
+    with TestClient(app):
+        tools = app.state.tool_registry.list_tools()
+
+        for tool in tools:
+            assert tool.permission_level == "read"
+            assert tool.requires_confirmation is False
+            assert tool.supported_intents == {"tool_action"}
+
+
+def test_application_registers_filesystem_verifiers(monkeypatch):
+    create_fake_provider(monkeypatch)
+
+    expected_verifiers = {
+        "list_directory",
+        "search_files",
+        "get_file_metadata",
+        "check_file_exists",
+    }
+
+    with TestClient(app):
+        registered_verifiers = set(
+            app.state.verification_engine._verifiers
+        )
+
+        assert registered_verifiers == expected_verifiers
