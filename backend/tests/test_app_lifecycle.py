@@ -6,12 +6,13 @@ from backend.app.core.config import settings
 from backend.app.api.dependencies import (
     get_provider_manager,
     get_tool_orchestrator,
+    get_tool_planner,
     get_verification_engine,
 )
 from backend.app.intelligence.capability_resolver import CapabilityResolver
 from backend.app.intelligence.execution_engine import ExecutionEngine
-from backend.app.intelligence.provider_manager import ProviderManager
 from backend.app.intelligence.tool_orchestrator import ToolOrchestrator
+from backend.app.intelligence.tool_planner import ToolPlanner
 from backend.app.intelligence.tool_registry import ToolRegistry
 from backend.app.intelligence.tool_security import ToolSecurityManager
 from backend.app.intelligence.verification_engine import VerificationEngine
@@ -50,6 +51,7 @@ def test_application_initializes_intelligence_components(monkeypatch):
         assert isinstance(app.state.execution_engine, ExecutionEngine)
         assert isinstance(app.state.verification_engine, VerificationEngine)
         assert isinstance(app.state.tool_orchestrator, ToolOrchestrator)
+        assert isinstance(app.state.tool_planner, ToolPlanner)
 
         assert app.state.tool_security.granted_permissions == {"read"}
 
@@ -74,6 +76,8 @@ def test_intelligence_components_share_correct_dependencies(monkeypatch):
         assert orchestrator.execution_engine is execution_engine
         assert orchestrator.verification_engine is verification_engine
 
+        assert isinstance(app.state.tool_planner, ToolPlanner)
+
 
 def test_dependencies_return_application_shared_instances(monkeypatch):
     create_fake_provider(monkeypatch)
@@ -95,6 +99,11 @@ def test_dependencies_return_application_shared_instances(monkeypatch):
         assert (
             get_verification_engine(request)
             is app.state.verification_engine
+        )
+
+        assert (
+            get_tool_planner(request)
+            is app.state.tool_planner
         )
 
 
@@ -208,3 +217,19 @@ def test_application_registers_filesystem_verifiers(monkeypatch):
         )
 
         assert registered_verifiers == expected_verifiers
+
+
+def test_tool_planner_dependency_returns_shared_instance(monkeypatch):
+    create_fake_provider(monkeypatch)
+
+    with TestClient(app):
+        request = type(
+            "FakeRequest",
+            (),
+            {"app": app},
+        )()
+
+        assert (
+            get_tool_planner(request)
+            is app.state.tool_planner
+        )

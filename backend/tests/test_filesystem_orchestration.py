@@ -39,6 +39,34 @@ def filesystem_app(monkeypatch, tmp_path):
         yield app
 
 
+@pytest.fixture
+def filesystem_chat_client(monkeypatch, tmp_path):
+    monkeypatch.setattr(
+        "backend.app.main.ProviderManager",
+        FakeProviderManager,
+    )
+
+    monkeypatch.setattr(
+        "backend.app.main.settings.SILVANA_WORKSPACE_ROOT",
+        tmp_path,
+    )
+
+    (tmp_path / "notes.txt").write_text(
+        "SILVANA filesystem integration test.",
+        encoding="utf-8",
+    )
+
+    (tmp_path / "analysis.py").write_text(
+        "print('SILVANA integration test')",
+        encoding="utf-8",
+    )
+
+    (tmp_path / "reports").mkdir()
+
+    with TestClient(app) as client:
+        yield client
+
+
 def make_intent():
     return IntentResult(
         intent=Intent.TOOL_ACTION,
@@ -108,3 +136,28 @@ def test_filesystem_discovery_requires_explicit_selection(
 
     assert result.execution is None
     assert result.verification is None
+
+
+def test_chat_endpoint_executes_and_verifies_filesystem_request(
+    filesystem_chat_client,
+):
+    response = filesystem_chat_client.post(
+        "/api/v1/chat",
+        json={
+            "messages": [
+                {
+                    "role": "user",
+                    "content": "Find all Python files.",
+                }
+            ]
+        },
+    )
+
+    assert response.status_code == 200
+
+    result = response.json()
+
+    assert result["provider"] == "internal"
+    assert result["model"] == "filesystem-tools"
+
+    assert "analysis.py" in result["content"]

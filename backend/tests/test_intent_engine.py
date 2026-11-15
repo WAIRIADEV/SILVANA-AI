@@ -264,3 +264,68 @@ def test_context_does_not_change_original_confidence(
 
     assert with_context.confidence == without_context.confidence
     assert with_context.intent == without_context.intent
+
+
+# ---------------------------------------------------------
+# FILESYSTEM INTENT CLASSIFICATION
+# ---------------------------------------------------------
+
+@pytest.mark.parametrize(
+    ("message", "expected_rule"),
+    [
+        # File and directory discovery
+        ("Find all Python files in my workspace.", "filesystem_search"),
+        ("Search for PDF files.", "filesystem_search"),
+        ("List my workspace files.", "filesystem_search"),
+        ("Show me the contents of this folder.", "filesystem_search"),
+
+        # Direct filename searches
+        ("Find settings.json", "filesystem_search"),
+        ("Locate config.py", "filesystem_search"),
+        ("Search for report.pdf", "filesystem_search"),
+        ("Find package-lock.json", "filesystem_search"),
+
+        # File existence
+        ("Check whether config.py exists.", "filesystem_existence"),
+        ("Does settings.json exist?", "filesystem_existence"),
+
+        # File metadata
+        ("Inspect the metadata of report.pdf.", "filesystem_metadata"),
+        ("When was main.py last modified?", "filesystem_metadata"),
+    ],
+)
+def test_classifies_filesystem_requests(
+    engine,
+    message,
+    expected_rule,
+):
+    result = engine.classify(message)
+
+    assert result.intent == Intent.TOOL_ACTION
+    assert result.requires_tool is True
+    assert result.matched_rule == expected_rule
+
+
+# ---------------------------------------------------------
+# GENERAL QUESTIONS MUST NOT BECOME FILESYSTEM ACTIONS
+# ---------------------------------------------------------
+
+@pytest.mark.parametrize(
+    "message",
+    [
+        "Explain how Python works.",
+        "How do neural networks learn?",
+        "Tell me about filesystem permissions.",
+        "Find the latest machine learning trends.",
+    ],
+)
+def test_general_questions_do_not_become_filesystem_actions(
+    engine,
+    message,
+):
+    result = engine.classify(message)
+
+    assert result.intent != Intent.TOOL_ACTION
+    assert result.matched_rule != "filesystem_search"
+    assert result.matched_rule != "filesystem_metadata"
+    assert result.matched_rule != "filesystem_existence"

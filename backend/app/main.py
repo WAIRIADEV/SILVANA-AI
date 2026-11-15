@@ -12,6 +12,7 @@ from backend.app.intelligence.tool_security import ToolSecurityManager
 from backend.app.intelligence.capability_resolver import CapabilityResolver
 from backend.app.intelligence.execution_engine import ExecutionEngine
 from backend.app.intelligence.tool_orchestrator import ToolOrchestrator
+from backend.app.intelligence.tool_planner import ToolPlanner
 from backend.app.intelligence.verification_engine import VerificationEngine
 
 from backend.app.intelligence.filesystem.workspace import WorkspaceBoundary
@@ -58,6 +59,9 @@ async def lifespan(app: FastAPI):
     app.state.capability_resolver = CapabilityResolver(
         registry=app.state.tool_registry
     )
+
+    # Initialize deterministic natural-language tool planning.
+    app.state.tool_planner = ToolPlanner()
 
     # Initialize controlled tool execution.
     app.state.execution_engine = ExecutionEngine(

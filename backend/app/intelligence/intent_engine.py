@@ -25,7 +25,6 @@ class IntentResult:
     requires_confirmation: bool
     matched_rule: str | None = None
 
-    # Conversation context metadata.
     is_follow_up: bool = False
     is_correction: bool = False
     is_new_topic: bool = False
@@ -35,26 +34,98 @@ class IntentResult:
 
 class IntentEngine:
     """
-    Baseline rule-based intent classifier.
+    Rule-based intent classifier.
+
+    This component identifies what the user is asking for.
+    It does not select, authorize, or execute tools.
 
     Confidence values are heuristic scores, not calibrated
-    probabilities. This engine classifies requests only.
+    probabilities.
 
-    Optional conversation context enriches the classification
-    result but does not independently change its intent.
+    Conversation context enriches classification metadata
+    without independently overriding the detected intent.
     """
 
     _RULES = [
+        # -------------------------------------------------
+        # FILESYSTEM SEARCH
+        # -------------------------------------------------
+
+        (
+            Intent.TOOL_ACTION,
+            0.95,
+            "filesystem_search",
+            (
+                r"\b(find|search for|look for|locate)\b.*"
+                r"\b(files?|folders?|directories|documents?)\b",
+
+                r"\b(list|show|display)\b.*"
+                r"\b(files?|folders?|directories|contents)\b",
+
+                r"\b(find|search for|look for|locate)\b.*"
+                r"\b[a-z0-9_.-]+\.[a-z0-9]{1,10}\b",
+            ),
+        ),
+
+        # -------------------------------------------------
+        # FILESYSTEM METADATA
+        # -------------------------------------------------
+
+        (
+            Intent.TOOL_ACTION,
+            0.95,
+            "filesystem_metadata",
+            (
+                r"\b(inspect|get|show|check)\b.*"
+                r"\b(metadata|file properties|file details)\b",
+
+                r"\bwhen was\b.*\bmodified\b",
+
+                r"\b(last modified|modification date)\b",
+            ),
+        ),
+
+        # -------------------------------------------------
+        # FILE EXISTENCE
+        # -------------------------------------------------
+
+        (
+            Intent.TOOL_ACTION,
+            0.95,
+            "filesystem_existence",
+            (
+                r"\b(check|verify|confirm)\b.*"
+                r"\b(file|folder|directory|path)\b.*"
+                r"\b(exists?|present)\b",
+
+                r"\b(check|verify|confirm)\b.*"
+                r"\b[a-z0-9_.-]+\.[a-z0-9]{1,10}\b.*"
+                r"\bexists?\b",
+
+                r"\b(does|do)\b.*"
+                r"\b[a-z0-9_.-]+\.[a-z0-9]{1,10}\b.*"
+                r"\bexist\b",
+            ),
+        ),
+
+        # -------------------------------------------------
+        # GENERAL TOOL ACTIONS
+        # -------------------------------------------------
+
         (
             Intent.TOOL_ACTION,
             0.92,
             "explicit_action",
             (
                 r"\b(remind me|set a reminder)\b",
+
                 r"\b(i need a reminder|i want a reminder)\b",
+
                 r"\b(don't let me forget|do not let me forget)\b",
+
                 r"\b(make sure i remember)\b",
 
+                # Actions targeting an explicitly named object.
                 r"\b(remind me|set a reminder|schedule|book|send|"
                 r"delete|remove|rename|move|copy|create|make|open|"
                 r"close|download|upload|install|launch)\b.*"
@@ -62,24 +133,42 @@ class IntentEngine:
                 r"appointment|calendar event|application|app|"
                 r"browser|workflow)\b",
 
+                # Actions targeting a filename such as report.pdf.
+                r"\b(delete|remove|rename|move|copy|create|make|"
+                r"open|close|download|upload|install|launch)\b"
+                r"\s+(?:the\s+)?[\"']?"
+                r"[a-z0-9_.-]+\.[a-z0-9]{1,10}\b",
+
                 r"\b(turn on|turn off|enable|disable)\b.*"
                 r"\b(application|app|service|feature|device)\b",
             ),
         ),
+
+        # -------------------------------------------------
+        # DATA ANALYSIS
+        # -------------------------------------------------
+
         (
             Intent.DATA_ANALYSIS,
             0.90,
             "data_analysis",
             (
                 r"\b(csv|dataframe|dataset|spreadsheet)\b",
+
                 r"\b(correlation|regression|classification|"
                 r"clustering|standard deviation|hypothesis test)\b",
+
                 r"\b(analy[sz]e|clean|preprocess|visuali[sz]e|"
                 r"plot|forecast|calculate|compute)\b.*"
                 r"\b(data|dataset|csv|spreadsheet|records|"
                 r"sales|metrics|numbers)\b",
             ),
         ),
+
+        # -------------------------------------------------
+        # DOCUMENT QUESTIONS
+        # -------------------------------------------------
+
         (
             Intent.DOCUMENT_QA,
             0.88,
@@ -87,12 +176,19 @@ class IntentEngine:
             (
                 r"\b(pdf|docx|document|report|research paper|"
                 r"contract)\b",
+
                 r"\b(summarize|summarise|extract|quote)\b.*"
                 r"\b(file|document|report|paper|pdf)\b",
+
                 r"\b(what does|what is in|according to)\b.*"
                 r"\b(document|report|pdf|file)\b",
             ),
         ),
+
+        # -------------------------------------------------
+        # RESEARCH
+        # -------------------------------------------------
+
         (
             Intent.RESEARCH,
             0.86,
@@ -100,6 +196,7 @@ class IntentEngine:
             (
                 r"\b(research|investigate|look up|find sources|"
                 r"latest developments|current developments)\b",
+
                 r"\b(latest|recent|current)\b.*"
                 r"\b(technology|news|developments|trends|"
                 r"research|companies|models)\b",
@@ -113,7 +210,7 @@ class IntentEngine:
         context: ConversationContext | None = None,
     ) -> IntentResult:
         """
-        Classify a user request and optionally attach conversation context.
+        Classify a message and optionally attach conversation context.
         """
 
         result = self._classify_message(text)
@@ -133,7 +230,9 @@ class IntentEngine:
         )
 
     def _classify_message(self, text: str) -> IntentResult:
-        """Apply the existing deterministic intent rules."""
+        """
+        Apply deterministic classification rules in priority order.
+        """
 
         if not isinstance(text, str) or not text.strip():
             return IntentResult(
@@ -162,6 +261,10 @@ class IntentEngine:
                         matched_rule=rule_name,
                     )
 
+        # -------------------------------------------------
+        # GREETINGS
+        # -------------------------------------------------
+
         if re.search(
             r"\b(hi|hello|hey|good morning|good evening)\b",
             normalized_text,
@@ -173,6 +276,10 @@ class IntentEngine:
                 requires_confirmation=False,
                 matched_rule="greeting",
             )
+
+        # -------------------------------------------------
+        # DEFAULT CONVERSATION
+        # -------------------------------------------------
 
         return IntentResult(
             intent=Intent.GENERAL_CHAT,

@@ -1,10 +1,16 @@
 
 import pytest
 
+from unittest.mock import AsyncMock
+from types import SimpleNamespace
+
 from fastapi.testclient import TestClient
 
 from backend.app.main import app
-from backend.app.api.dependencies import get_provider_manager
+from backend.app.api.dependencies import (
+    get_provider_manager,
+    get_tool_planner,
+)
 from backend.app.api.routes import chat as chat_route
 from backend.app.intelligence.base import LLMResponse
 from backend.app.intelligence.errors import (
@@ -12,6 +18,10 @@ from backend.app.intelligence.errors import (
     ProviderRequestError,
     ProviderTimeout,
     ProviderUnavailable,
+)
+from backend.app.intelligence.tool_planner import (
+    ToolPlan,
+    ToolPlanStatus,
 )
 
 
@@ -59,6 +69,7 @@ class FakeManager:
     ):
         self.should_fail = should_fail
         self.provider_error = provider_error
+        self.provider_calls = []
 
     def available_providers(self):
         return ["gemini", "groq"]
@@ -67,6 +78,7 @@ class FakeManager:
         return "gemini"
 
     def get_provider(self, name):
+        self.provider_calls.append(name)
 
         if self.should_fail:
             raise ValueError("Provider is not configured")
@@ -75,6 +87,24 @@ class FakeManager:
             provider_name=name,
             error_to_raise=self.provider_error,
         )
+
+
+class FakePlanner:
+
+    def __init__(self, plan):
+        self.plan_result = plan
+        self.calls = []
+
+    def plan(self, intent, user_request, available_tools):
+        self.calls.append(
+            {
+                "intent": intent,
+                "user_request": user_request,
+                "available_tools": available_tools,
+            }
+        )
+
+        return self.plan_result
 
 
 def install_fake_manager(monkeypatch, manager=None):
@@ -87,6 +117,21 @@ def install_fake_manager(monkeypatch, manager=None):
         get_provider_manager,
         lambda: manager,
     )
+
+    return manager
+
+
+def install_fake_planner(monkeypatch, plan):
+
+    planner = FakePlanner(plan)
+
+    monkeypatch.setitem(
+        app.dependency_overrides,
+        get_tool_planner,
+        lambda: planner,
+    )
+
+    return planner
 
 
 def test_chat_endpoint(monkeypatch):
@@ -272,6 +317,7 @@ def test_chat_endpoint_handles_provider_failures(
 # CONVERSATION INTELLIGENCE API INTEGRATION
 # ---------------------------------------------------------
 
+
 def test_chat_endpoint_runs_intent_classification(monkeypatch):
     install_fake_manager(monkeypatch)
 
@@ -336,6 +382,7 @@ def test_chat_endpoint_preserves_full_conversation_for_provider(
     class InspectingManager(FakeManager):
 
         def get_provider(self, name):
+            self.provider_calls.append(name)
             return InspectingProvider(provider_name=name)
 
     install_fake_manager(
@@ -421,3 +468,259 @@ def test_chat_endpoint_classifies_new_topic(monkeypatch):
     assert result.is_new_topic is True
     assert result.is_follow_up is False
     assert result.references_previous_context is False
+
+
+# ---------------------------------------------------------
+# NATURAL-LANGUAGE TOOL ROUTING INTEGRATION
+# ---------------------------------------------------------
+
+
+def test_chat_endpoint_routes_ready_tool_plan_to_orchestrator(
+    monkeypatch,
+):
+    manager = install_fake_manager(monkeypatch)
+
+    plan = ToolPlan(
+        status=ToolPlanStatus.READY,
+        tool_name="list_directory",
+        arguments={"path": "."},
+        confidence=1.0,
+        message="Listing workspace files.",
+        matched_rule="filesystem_search",
+    )
+
+    planner = install_fake_planner(monkeypatch, plan)
+
+    with TestClient(app) as client:
+        orchestrator = app.state.tool_orchestrator
+
+        orchestration_result = object()
+
+        orchestrate_mock = AsyncMock(
+            return_value=orchestration_result
+        )
+
+        monkeypatch.setattr(
+            orchestrator,
+            "orchestrate",
+            orchestrate_mock,
+        )
+
+        monkeypatch.setattr(
+            chat_route.response_engine,
+            "generate",
+            lambda result: SimpleNamespace(
+                content="I verified the workspace listing."
+            ),
+        )
+
+        response = client.post(
+            "/api/v1/chat",
+            json={
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": "List files",
+                    }
+                ]
+            },
+        )
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert data["content"] == (
+        "I verified the workspace listing."
+    )
+    assert data["provider"] == "internal"
+    assert data["model"] == "filesystem-tools"
+
+    # Confirm the planner received the classified request.
+    assert len(planner.calls) == 1
+    assert planner.calls[0]["user_request"] == "List files"
+
+    # Confirm the actual filesystem capability was discovered.
+    available_tools = planner.calls[0]["available_tools"]
+
+    assert any(
+        capability.tool_name == "list_directory"
+        for capability in available_tools
+    )
+
+    # Confirm the orchestrator received the deterministic plan.
+    orchestrate_mock.assert_awaited_once()
+
+    call_arguments = orchestrate_mock.await_args.kwargs
+
+    assert call_arguments["arguments"] == {"path": "."}
+    assert call_arguments["selected_tool"] == "list_directory"
+    assert call_arguments["user_confirmed"] is False
+
+    # Filesystem requests must not initialize an LLM provider.
+    assert manager.provider_calls == []
+
+
+def test_chat_endpoint_requests_clarification_for_incomplete_tool_plan(
+    monkeypatch,
+):
+    manager = install_fake_manager(monkeypatch)
+
+    plan = ToolPlan(
+        status=ToolPlanStatus.CLARIFICATION_REQUIRED,
+        tool_name=None,
+        arguments={},
+        confidence=0.5,
+        message="Which file would you like me to check?",
+        matched_rule="filesystem_existence",
+    )
+
+    planner = install_fake_planner(monkeypatch, plan)
+
+    with TestClient(app) as client:
+        orchestrator = app.state.tool_orchestrator
+
+        orchestrate_mock = AsyncMock()
+
+        monkeypatch.setattr(
+            orchestrator,
+            "orchestrate",
+            orchestrate_mock,
+        )
+
+        response = client.post(
+            "/api/v1/chat",
+            json={
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": "Check whether a file exists",
+                    }
+                ]
+            },
+        )
+
+    assert response.status_code == 200
+    assert response.json()["content"] == plan.message
+    assert response.json()["provider"] == "internal"
+    assert response.json()["model"] == "tool-planner"
+
+    assert len(planner.calls) == 1
+    orchestrate_mock.assert_not_awaited()
+
+    assert manager.provider_calls == []
+
+
+def test_chat_endpoint_rejects_unsupported_tool_plan(
+    monkeypatch,
+):
+    manager = install_fake_manager(monkeypatch)
+
+    plan = ToolPlan(
+        status=ToolPlanStatus.UNSUPPORTED,
+        tool_name=None,
+        arguments={},
+        confidence=1.0,
+        message="This action is not currently supported.",
+        matched_rule="explicit_action",
+    )
+
+    planner = install_fake_planner(monkeypatch, plan)
+
+    with TestClient(app) as client:
+        orchestrator = app.state.tool_orchestrator
+
+        orchestrate_mock = AsyncMock()
+
+        monkeypatch.setattr(
+            orchestrator,
+            "orchestrate",
+            orchestrate_mock,
+        )
+
+        response = client.post(
+            "/api/v1/chat",
+            json={
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": "Delete report.pdf",
+                    }
+                ]
+            },
+        )
+
+    assert response.status_code == 200
+    assert response.json()["content"] == plan.message
+    assert response.json()["provider"] == "internal"
+    assert response.json()["model"] == "tool-planner"
+
+    assert len(planner.calls) == 1
+    orchestrate_mock.assert_not_awaited()
+
+    # Unsupported actions must never fall through to an LLM.
+    assert manager.provider_calls == []
+
+
+def test_chat_endpoint_passes_orchestration_result_to_response_engine(
+    monkeypatch,
+):
+    install_fake_manager(monkeypatch)
+
+    plan = ToolPlan(
+        status=ToolPlanStatus.READY,
+        tool_name="list_directory",
+        arguments={"path": "."},
+        confidence=1.0,
+        message="Listing workspace files.",
+        matched_rule="filesystem_search",
+    )
+
+    install_fake_planner(monkeypatch, plan)
+
+    captured_results = []
+    expected_result = object()
+
+    with TestClient(app) as client:
+        orchestrator = app.state.tool_orchestrator
+
+        async def fake_orchestrate(**kwargs):
+            return expected_result
+
+        monkeypatch.setattr(
+            orchestrator,
+            "orchestrate",
+            fake_orchestrate,
+        )
+
+        def generate_spy(result):
+            captured_results.append(result)
+
+            return SimpleNamespace(
+                content="The operation could not be confirmed."
+            )
+
+        monkeypatch.setattr(
+            chat_route.response_engine,
+            "generate",
+            generate_spy,
+        )
+
+        response = client.post(
+            "/api/v1/chat",
+            json={
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": "List files",
+                    }
+                ]
+            },
+        )
+
+    assert response.status_code == 200
+    assert response.json()["content"] == (
+        "The operation could not be confirmed."
+    )
+
+    assert captured_results == [expected_result]
