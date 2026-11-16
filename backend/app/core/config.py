@@ -20,6 +20,17 @@ class Settings(BaseSettings):
         Path(__file__).resolve().parents[3] / "workspace"
     )
 
+    # Private document storage, isolated from the user-accessible workspace.
+    SILVANA_DOCUMENT_STORAGE_ROOT: Path = (
+        Path(__file__).resolve().parents[3] / "storage" / "documents"
+    )
+
+    # Maximum size allowed for an individual uploaded document.
+    SILVANA_DOCUMENT_MAX_FILE_SIZE_BYTES: int = 20 * 1024 * 1024
+
+    # Temporary conversation documents expire 24 hours after last activity.
+    SILVANA_DOCUMENT_TEMPORARY_RETENTION_HOURS: int = 24
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
