@@ -36,6 +36,9 @@ from backend.app.intelligence.documents.chunker import (
 from backend.app.intelligence.documents.indexing import (
     DocumentIndexingService,
 )
+from backend.app.intelligence.documents.retrieval import (
+    DocumentRetrievalService,
+)
 
 from backend.app.intelligence.embeddings.fastembed import (
     FastEmbedProvider,
@@ -128,7 +131,7 @@ async def lifespan(app: FastAPI):
         # Initialize document text extraction.
         app.state.document_extractor = DocumentExtractor()
 
-        # Construct the local embedding provider.
+        # Construct one shared local embedding provider.
         # The actual model remains lazy-loaded until inference.
         app.state.embedding_provider = FastEmbedProvider()
 
@@ -146,6 +149,13 @@ async def lifespan(app: FastAPI):
             storage=app.state.document_storage,
             extractor=app.state.document_extractor,
             chunker=app.state.document_chunker,
+            embedding_provider=app.state.embedding_provider,
+        )
+
+        # Coordinate query embedding and scoped document retrieval.
+        # Reuse the same repository and embedding provider.
+        app.state.document_retrieval_service = DocumentRetrievalService(
+            repository=app.state.document_repository,
             embedding_provider=app.state.embedding_provider,
         )
 

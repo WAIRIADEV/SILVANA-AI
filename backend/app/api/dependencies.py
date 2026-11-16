@@ -15,6 +15,9 @@ from backend.app.intelligence.documents.storage import (
 from backend.app.intelligence.documents.indexing import (
     DocumentIndexingService,
 )
+from backend.app.intelligence.documents.retrieval import (
+    DocumentRetrievalService,
+)
 
 
 def get_provider_manager(request: Request) -> ProviderManager:
@@ -45,3 +48,9 @@ def get_document_indexing_service(
     request: Request,
 ) -> DocumentIndexingService:
     return request.app.state.document_indexing_service
+
+
+def get_document_retrieval_service(
+    request: Request,
+) -> DocumentRetrievalService:
+    return request.app.state.document_retrieval_service

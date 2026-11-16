@@ -1,4 +1,7 @@
-
+from backend.app.intelligence.documents.models import (
+    DocumentScope,
+    DocumentStatus,
+)
 import io
 from types import SimpleNamespace
 from uuid import uuid4
@@ -16,7 +19,10 @@ from backend.app.api.dependencies import (
 from backend.app.intelligence.documents.indexing import (
     DocumentIndexingError,
 )
-from backend.app.intelligence.documents.models import DocumentStatus
+from backend.app.intelligence.documents.models import (
+    DocumentScope,
+    DocumentStatus,
+)
 from backend.app.intelligence.documents.repository import DocumentRepository
 from backend.app.intelligence.documents.storage import DocumentStorage
 
@@ -648,3 +654,194 @@ def test_delete_database_failure_restores_storage_file(
     assert document_api.repository.get_document(document_id) is not None
     assert document_api.storage.exists(stored_document.storage_key)
     assert document_api.storage.read(stored_document.storage_key) == original_content
+
+def test_bulk_delete_removes_only_target_conversation_documents(
+    document_api,
+):
+    conversation_a = uuid4()
+    conversation_b = uuid4()
+
+    first, _ = upload_temporary(
+        document_api.client,
+        conversation_id=conversation_a,
+        filename="first.txt",
+    )
+    second, _ = upload_temporary(
+        document_api.client,
+        conversation_id=conversation_a,
+        filename="second.txt",
+    )
+    unrelated, _ = upload_temporary(
+        document_api.client,
+        conversation_id=conversation_b,
+        filename="unrelated.txt",
+    )
+
+    persistent_response = document_api.client.post(
+        "/api/v1/documents/upload",
+        data={"scope": "persistent"},
+        files={
+            "file": (
+                "library.txt",
+                b"Persistent library document.",
+                "text/plain",
+            )
+        },
+    )
+
+    assert persistent_response.status_code == 201
+
+    target_documents = [
+        document_api.repository.get_document(first.json()["id"]),
+        document_api.repository.get_document(second.json()["id"]),
+    ]
+    unrelated_document = document_api.repository.get_document(
+        unrelated.json()["id"]
+    )
+    persistent_document = document_api.repository.get_document(
+        persistent_response.json()["id"]
+    )
+
+    assert all(target_documents)
+    assert unrelated_document is not None
+    assert persistent_document is not None
+
+    response = document_api.client.delete(
+        f"/api/v1/documents/conversation/{conversation_a}"
+    )
+
+    assert response.status_code == 200
+    assert response.json()["deleted_count"] == 2
+
+    for document in target_documents:
+        assert document_api.repository.get_document(document.id) is None
+        assert not document_api.storage.exists(document.storage_key)
+
+    assert (
+        document_api.repository.get_document(unrelated_document.id)
+        is not None
+    )
+    assert document_api.storage.exists(unrelated_document.storage_key)
+
+    assert (
+        document_api.repository.get_document(persistent_document.id)
+        is not None
+    )
+    assert document_api.storage.exists(persistent_document.storage_key)
+
+
+def test_bulk_delete_empty_conversation_returns_zero(document_api):
+    response = document_api.client.delete(
+        f"/api/v1/documents/conversation/{uuid4()}"
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"deleted_count": 0}
+
+
+def test_bulk_delete_storage_failure_preserves_documents(
+    document_api,
+    monkeypatch,
+):
+    conversation_id = uuid4()
+
+    upload_temporary(
+        document_api.client,
+        conversation_id=conversation_id,
+        filename="first.txt",
+    )
+    upload_temporary(
+        document_api.client,
+        conversation_id=conversation_id,
+        filename="second.txt",
+    )
+
+    documents = document_api.repository.list_documents(
+        scope=__import__(
+            "backend.app.intelligence.documents.models",
+            fromlist=["DocumentScope"],
+        ).DocumentScope.TEMPORARY,
+        conversation_id=conversation_id,
+    )
+
+    original_delete = document_api.storage.delete
+    call_count = 0
+
+    def fail_second_delete(storage_key):
+        nonlocal call_count
+        call_count += 1
+
+        if call_count == 2:
+            raise OSError("Simulated storage failure")
+
+        return original_delete(storage_key)
+
+    monkeypatch.setattr(
+        document_api.storage,
+        "delete",
+        fail_second_delete,
+    )
+
+    response = document_api.client.delete(
+        f"/api/v1/documents/conversation/{conversation_id}"
+    )
+
+    assert response.status_code == 500
+
+    for document in documents:
+        assert document_api.repository.get_document(document.id) is not None
+        assert document_api.storage.exists(document.storage_key)
+
+
+def test_bulk_delete_database_failure_restores_files(
+    document_api,
+    monkeypatch,
+):
+    conversation_id = uuid4()
+
+    upload_temporary(
+        document_api.client,
+        conversation_id=conversation_id,
+        filename="first.txt",
+    )
+    upload_temporary(
+        document_api.client,
+        conversation_id=conversation_id,
+        filename="second.txt",
+    )
+
+    documents = document_api.repository.list_documents(
+        scope=__import__(
+            "backend.app.intelligence.documents.models",
+            fromlist=["DocumentScope"],
+        ).DocumentScope.TEMPORARY,
+        conversation_id=conversation_id,
+    )
+
+    original_contents = {
+        document.id: document_api.storage.read(document.storage_key)
+        for document in documents
+    }
+
+    def fail_database_delete(conversation_id):
+        raise RuntimeError("Simulated database failure")
+
+    monkeypatch.setattr(
+        document_api.repository,
+        "delete_conversation_documents",
+        fail_database_delete,
+    )
+
+    response = document_api.client.delete(
+        f"/api/v1/documents/conversation/{conversation_id}"
+    )
+
+    assert response.status_code == 500
+
+    for document in documents:
+        assert document_api.repository.get_document(document.id) is not None
+        assert document_api.storage.exists(document.storage_key)
+        assert (
+            document_api.storage.read(document.storage_key)
+            == original_contents[document.id]
+        )

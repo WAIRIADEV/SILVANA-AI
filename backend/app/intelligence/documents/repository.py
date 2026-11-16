@@ -787,3 +787,181 @@ class DocumentRepository:
             )
 
         return result.rowcount
+
+    def search_chunks(
+        self,
+        query_vector: Sequence[float],
+        *,
+        model_name: str,
+        dimensions: int,
+        knowledge_scope: str,
+        conversation_id: UUID | None = None,
+        limit: int = 5,
+        now: datetime | None = None,
+    ) -> list[dict[str, object]]:
+        """Return the most similar chunks from the requested knowledge scope."""
+        if knowledge_scope not in {"none", "conversation", "library", "both"}:
+            raise ValueError("Unsupported knowledge scope.")
+
+        if knowledge_scope == "none":
+            return []
+
+        if knowledge_scope in {"conversation", "both"} and conversation_id is None:
+            raise ValueError(
+                "A conversation ID is required for this knowledge scope."
+            )
+
+        if not model_name or not model_name.strip():
+            raise ValueError("Embedding model name cannot be empty.")
+
+        if dimensions <= 0 or len(query_vector) != dimensions:
+            raise ValueError(
+                "Query embedding dimensions do not match the expected dimensions."
+            )
+
+        if limit <= 0:
+            raise ValueError("Search limit must be greater than zero.")
+
+        try:
+            vector = [float(value) for value in query_vector]
+        except (TypeError, ValueError, OverflowError) as exc:
+            raise ValueError("Query embedding contains invalid values.") from exc
+
+        if not all(math.isfinite(value) for value in vector):
+            raise ValueError("Query embedding must contain finite values.")
+
+        query_norm = math.sqrt(sum(value * value for value in vector))
+        if query_norm == 0:
+            raise ValueError("Query embedding cannot be a zero vector.")
+
+        now_datetime = now or self._utc_now()
+        self._validate_datetime(now_datetime)
+        serialized_now = self._serialize_datetime(now_datetime)
+
+        conditions = [
+            "d.status = ?",
+            "e.model_name = ?",
+            "e.dimensions = ?",
+        ]
+        parameters: list[object] = [
+            DocumentStatus.INDEXED.value,
+            model_name,
+            dimensions,
+        ]
+
+        if knowledge_scope == "conversation":
+            conditions.extend([
+                "d.scope = ?",
+                "d.conversation_id = ?",
+                "d.expires_at IS NOT NULL",
+                "d.expires_at > ?",
+            ])
+            parameters.extend([
+                DocumentScope.TEMPORARY.value,
+                str(conversation_id),
+                serialized_now,
+            ])
+
+        elif knowledge_scope == "library":
+            conditions.extend([
+                "d.scope = ?",
+                "d.conversation_id IS NULL",
+            ])
+            parameters.append(DocumentScope.PERSISTENT.value)
+
+        else:  # both
+            conditions.append(
+                """
+                (
+                    (
+                        d.scope = ?
+                        AND d.conversation_id IS NULL
+                    )
+                    OR
+                    (
+                        d.scope = ?
+                        AND d.conversation_id = ?
+                        AND d.expires_at IS NOT NULL
+                        AND d.expires_at > ?
+                    )
+                )
+                """
+            )
+            parameters.extend([
+                DocumentScope.PERSISTENT.value,
+                DocumentScope.TEMPORARY.value,
+                str(conversation_id),
+                serialized_now,
+            ])
+
+        query = f"""
+            SELECT
+                d.id AS document_id,
+                d.filename,
+                d.scope,
+                c.id AS chunk_id,
+                c.chunk_index,
+                c.content,
+                c.page_number,
+                e.model_name,
+                e.dimensions,
+                e.vector,
+                e.created_at
+            FROM documents AS d
+            INNER JOIN document_chunks AS c
+                ON c.document_id = d.id
+            INNER JOIN chunk_embeddings AS e
+                ON e.chunk_id = c.id
+            WHERE {' AND '.join(conditions)}
+        """
+
+        with self._connect() as connection:
+            rows = connection.execute(query, parameters).fetchall()
+
+        matches: list[dict[str, object]] = []
+
+        for row in rows:
+            try:
+                embedding = self._embedding_from_row(row)
+            except (ValueError, struct.error):
+                # Ignore corrupt vectors rather than failing the entire search.
+                continue
+
+            stored_vector = embedding.vector
+            stored_norm = math.sqrt(
+                sum(value * value for value in stored_vector)
+            )
+
+            if stored_norm == 0:
+                continue
+
+            dot_product = sum(
+                query_value * stored_value
+                for query_value, stored_value in zip(
+                    vector,
+                    stored_vector,
+                )
+            )
+
+            similarity = dot_product / (query_norm * stored_norm)
+
+            matches.append({
+                "document_id": UUID(row["document_id"]),
+                "filename": row["filename"],
+                "scope": DocumentScope(row["scope"]),
+                "chunk_id": UUID(row["chunk_id"]),
+                "chunk_index": row["chunk_index"],
+                "content": row["content"],
+                "page_number": row["page_number"],
+                "similarity": similarity,
+            })
+
+        matches.sort(
+            key=lambda item: (
+                float(item["similarity"]),
+                -int(item["chunk_index"]),
+            ),
+            reverse=True,
+        )
+
+        return matches[:limit]

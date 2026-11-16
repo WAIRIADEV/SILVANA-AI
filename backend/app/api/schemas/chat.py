@@ -1,9 +1,8 @@
 
 from typing import Literal
+from uuid import UUID
 
-from backend.app.intelligence.identity import SILVANA_SYSTEM_INSTRUCTION
-
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class ChatMessageSchema(BaseModel):
@@ -39,6 +38,41 @@ class ChatRequest(BaseModel):
         le=8192,
     )
 
+    conversation_id: UUID | None = None
+
+    knowledge_scope: Literal[
+        "none",
+        "conversation",
+        "library",
+        "both",
+    ] = "none"
+
+    @model_validator(mode="after")
+    def validate_knowledge_scope(self):
+        """Require ownership context for temporary document access."""
+
+        if (
+            self.knowledge_scope in {"conversation", "both"}
+            and self.conversation_id is None
+        ):
+            raise ValueError(
+                "A conversation ID is required when knowledge scope "
+                "is 'conversation' or 'both'."
+            )
+
+        return self
+
+
+class ChatSourceCitation(BaseModel):
+    """A document source used to ground an assistant response."""
+
+    ref: str
+    document_id: UUID
+    filename: str
+    scope: Literal["temporary", "persistent"]
+    page_number: int | None = None
+    chunk_index: int
+
 
 class ChatResponse(BaseModel):
     """Structured response returned by SILVANA."""
@@ -50,3 +84,7 @@ class ChatResponse(BaseModel):
     input_tokens: int | None = None
     output_tokens: int | None = None
     finish_reason: str | None = None
+
+    sources: list[ChatSourceCitation] = Field(
+        default_factory=list,
+    )

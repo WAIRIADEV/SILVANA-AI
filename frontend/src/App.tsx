@@ -4,6 +4,7 @@ import './App.css'
 import { useBackendHealth } from './hooks/useBackendHealth'
 import HolographicCore from './components/HolographicCore'
 import ChatInterface from './components/ChatInterface'
+import DocumentWorkspace from './components/DocumentWorkspace'
 import { ASSISTANT_STATES } from './types/assistant'
 import useAssistantState from './hooks/useAssistantState'
 
@@ -13,8 +14,31 @@ type ExplorerSection =
   | 'documents'
   | 'activity'
 
+const CONVERSATION_STORAGE_KEY = 'silvana.conversation_id'
+
+function createConversationId(): string {
+  try {
+    const existingId = sessionStorage.getItem(CONVERSATION_STORAGE_KEY)
+
+    if (existingId) {
+      return existingId
+    }
+
+    const newId = crypto.randomUUID()
+    sessionStorage.setItem(CONVERSATION_STORAGE_KEY, newId)
+
+    return newId
+  } catch {
+    // Keep the application usable if browser storage is unavailable.
+    return crypto.randomUUID()
+  }
+}
+
 function App() {
   const backendHealth = useBackendHealth()
+
+  const [conversationId, setConversationId] =
+    useState<string>(createConversationId)
 
   const [activeSection, setActiveSection] =
     useState<ExplorerSection>('intelligence')
@@ -25,6 +49,21 @@ function App() {
   } = useAssistantState()
 
   const currentState = ASSISTANT_STATES[assistantState]
+
+  function handleConversationCleared() {
+    const newConversationId = crypto.randomUUID()
+
+    try {
+      sessionStorage.setItem(
+        CONVERSATION_STORAGE_KEY,
+        newConversationId,
+      )
+    } catch {
+      // The current session can continue without persistent browser storage.
+    }
+
+    setConversationId(newConversationId)
+  }
 
   const backendStatus =
     backendHealth.status === 'operational'
@@ -168,21 +207,7 @@ function App() {
 
       case 'documents':
         return (
-          <div className="explorer-content placeholder-content">
-            <span className="section-eyebrow">KNOWLEDGE SYSTEMS</span>
-            <div className="placeholder-symbol">▤</div>
-            <h2>Documents</h2>
-            <p>
-              A dedicated workspace for document understanding,
-              knowledge retrieval and contextual answers.
-            </p>
-            <span className="feature-status">PLANNED MODULE</span>
-            <div className="placeholder-divider" />
-            <p className="placeholder-detail">
-              Document ingestion, semantic retrieval and source
-              citations are planned for the document intelligence sprint.
-            </p>
-          </div>
+          <DocumentWorkspace conversationId={conversationId} />
         )
 
       case 'activity':
@@ -308,7 +333,11 @@ function App() {
         </section>
 
         <section className="interaction-panel">
-          <ChatInterface onStateChange={setAssistantState} />
+          <ChatInterface
+            onStateChange={setAssistantState}
+            conversationId={conversationId}
+            onConversationCleared={handleConversationCleared}
+          />
         </section>
 
         <aside className="explorer-panel">
@@ -317,7 +346,7 @@ function App() {
               <span className="section-eyebrow">WORKSPACE</span>
               <h2>EXPLORER</h2>
             </div>
-            <span className="explorer-menu-mark">•••</span>
+            <span className="explorer-menu-mark">···</span>
           </div>
 
           <div className="explorer-navigation">

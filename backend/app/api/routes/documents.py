@@ -403,6 +403,74 @@ def reindex_document(
         ) from None
 
 
+@router.delete("/conversation/{conversation_id}")
+def delete_conversation_documents(
+    conversation_id: UUID,
+    repository: DocumentRepository = Depends(get_document_repository),
+    storage: DocumentStorage = Depends(get_document_storage),
+):
+    """Delete all temporary documents belonging to one conversation."""
+
+    documents = repository.list_documents(
+        scope=DocumentScope.TEMPORARY,
+        conversation_id=conversation_id,
+    )
+
+    removed_files = []
+
+    try:
+        # Remove physical files first, retaining their contents so
+        # they can be restored if the database operation fails.
+        for document in documents:
+            if not storage.exists(document.storage_key):
+                continue
+
+            original_content = storage.read(document.storage_key)
+
+            if storage.delete(document.storage_key):
+                removed_files.append(
+                    (document, original_content)
+                )
+
+        # The repository deletion cascades to chunks and embeddings.
+        deleted_count = repository.delete_conversation_documents(
+            conversation_id
+        )
+
+        if deleted_count < len(documents):
+            raise RuntimeError(
+                "Not all conversation document records were deleted."
+            )
+
+        return {"deleted_count": deleted_count}
+
+    except Exception:
+        # Restore files if the database operation or file removal fails.
+        for document, original_content in removed_files:
+            try:
+                if not storage.exists(document.storage_key):
+                    storage.save(
+                        original_content,
+                        document_id=document.id,
+                    )
+            except Exception:
+                logger.exception(
+                    "CRITICAL: Failed to restore conversation document "
+                    "after bulk deletion failure: %s",
+                    document.id,
+                )
+
+        logger.exception(
+            "Failed to delete documents for conversation %s.",
+            conversation_id,
+        )
+
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Conversation documents could not be deleted.",
+        ) from None
+
+
 @router.delete(
     "/{document_id}",
     status_code=status.HTTP_204_NO_CONTENT,

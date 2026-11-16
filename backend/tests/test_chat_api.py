@@ -724,3 +724,520 @@ def test_chat_endpoint_passes_orchestration_result_to_response_engine(
     )
 
     assert captured_results == [expected_result]
+
+# ---------------------------------------------------------
+# DOCUMENT RETRIEVAL AND CITATION INTEGRATION
+# ---------------------------------------------------------
+
+from uuid import uuid4
+import json
+
+from backend.app.api.dependencies import (
+    get_document_retrieval_service,
+)
+from backend.app.intelligence.documents.models import DocumentScope
+
+
+class FakeRetrievalRepository:
+
+    def __init__(self):
+        self.touch_calls = []
+
+    def touch_conversation_documents(
+        self,
+        conversation_id,
+        retention_hours=24,
+    ):
+        self.touch_calls.append(
+            {
+                "conversation_id": conversation_id,
+                "retention_hours": retention_hours,
+            }
+        )
+
+
+class FakeRetrievalService:
+
+    def __init__(self, documents=None, error=None):
+        self.repository = FakeRetrievalRepository()
+        self.documents = documents or []
+        self.error = error
+        self.retrieve_calls = []
+
+    def retrieve(
+        self,
+        query,
+        *,
+        knowledge_scope="none",
+        conversation_id=None,
+        limit=5,
+    ):
+        self.retrieve_calls.append(
+            {
+                "query": query,
+                "knowledge_scope": knowledge_scope,
+                "conversation_id": conversation_id,
+                "limit": limit,
+            }
+        )
+
+        if self.error is not None:
+            raise self.error
+
+        return self.documents
+
+
+def install_fake_retrieval(monkeypatch, retrieval=None):
+
+    if retrieval is None:
+        retrieval = FakeRetrievalService()
+
+    monkeypatch.setitem(
+        app.dependency_overrides,
+        get_document_retrieval_service,
+        lambda: retrieval,
+    )
+
+    return retrieval
+
+
+def test_chat_retrieves_conversation_documents_and_returns_citations(
+    monkeypatch,
+):
+    from backend.app.core.config import settings
+
+    manager = FakeManager()
+    install_fake_manager(monkeypatch, manager)
+
+    conversation_id = uuid4()
+    document_id = uuid4()
+
+    retrieved_document = SimpleNamespace(
+        document_id=document_id,
+        filename="research.pdf",
+        scope=DocumentScope.TEMPORARY,
+        chunk_index=2,
+        content="The research identifies three major findings.",
+        page_number=4,
+        similarity=0.91,
+    )
+
+    retrieval = install_fake_retrieval(
+        monkeypatch,
+        FakeRetrievalService(documents=[retrieved_document]),
+    )
+
+    captured_requests = []
+
+    class InspectingProvider(FakeProvider):
+
+        async def generate(self, request):
+            captured_requests.append(request)
+            return await super().generate(request)
+
+    class InspectingManager(FakeManager):
+
+        def get_provider(self, name):
+            self.provider_calls.append(name)
+            return InspectingProvider(provider_name=name)
+
+    install_fake_manager(
+        monkeypatch,
+        InspectingManager(),
+    )
+
+    with TestClient(app) as client:
+        response = client.post(
+            "/api/v1/chat",
+            json={
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": "Summarise my research document.",
+                    }
+                ],
+                "conversation_id": str(conversation_id),
+                "knowledge_scope": "conversation",
+            },
+        )
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert data["sources"] == [
+        {
+            "ref": "S1",
+            "document_id": str(document_id),
+            "filename": "research.pdf",
+            "scope": "temporary",
+            "page_number": 4,
+            "chunk_index": 2,
+        }
+    ]
+
+    assert retrieval.retrieve_calls == [
+        {
+            "query": "Summarise my research document.",
+            "knowledge_scope": "conversation",
+            "conversation_id": conversation_id,
+            "limit": 5,
+        }
+    ]
+
+    assert retrieval.repository.touch_calls == [
+        {
+            "conversation_id": conversation_id,
+            "retention_hours": (
+                settings.SILVANA_DOCUMENT_TEMPORARY_RETENTION_HOURS
+            ),
+        }
+    ]
+
+    provider_messages = captured_requests[0].messages
+
+    assert provider_messages[0].role == "system"
+    assert "You are SILVANA" in provider_messages[0].content
+
+    assert provider_messages[1].role == "system"
+    assert "UNTRUSTED DATA" in provider_messages[1].content
+    assert '"ref": "S1"' in provider_messages[1].content
+    assert "The research identifies three major findings." in (
+        provider_messages[1].content
+    )
+
+    assert provider_messages[-1].content == (
+        "Summarise my research document."
+    )
+
+
+def test_chat_retrieves_library_documents_without_conversation_id(
+    monkeypatch,
+):
+    document_id = uuid4()
+
+    retrieved_document = SimpleNamespace(
+        document_id=document_id,
+        filename="knowledge-base.txt",
+        scope=DocumentScope.PERSISTENT,
+        chunk_index=0,
+        content="The library contains the project architecture.",
+        page_number=None,
+        similarity=0.88,
+    )
+
+    retrieval = install_fake_retrieval(
+        monkeypatch,
+        FakeRetrievalService(documents=[retrieved_document]),
+    )
+
+    install_fake_manager(monkeypatch)
+
+    with TestClient(app) as client:
+        response = client.post(
+            "/api/v1/chat",
+            json={
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": "What does the knowledge base say?",
+                    }
+                ],
+                "knowledge_scope": "library",
+            },
+        )
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert len(data["sources"]) == 1
+    assert data["sources"][0]["ref"] == "S1"
+    assert data["sources"][0]["document_id"] == str(document_id)
+    assert data["sources"][0]["scope"] == "persistent"
+
+    assert retrieval.retrieve_calls[0]["knowledge_scope"] == "library"
+    assert retrieval.retrieve_calls[0]["conversation_id"] is None
+
+
+def test_chat_returns_503_when_document_retrieval_fails(
+    monkeypatch,
+):
+    retrieval = install_fake_retrieval(
+        monkeypatch,
+        FakeRetrievalService(
+            error=RuntimeError("Simulated retrieval failure"),
+        ),
+    )
+
+    manager = install_fake_manager(monkeypatch)
+
+    with TestClient(app) as client:
+        response = client.post(
+            "/api/v1/chat",
+            json={
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": "Search my knowledge base.",
+                    }
+                ],
+                "knowledge_scope": "library",
+            },
+        )
+
+    assert response.status_code == 503
+
+    assert response.json()["detail"] == (
+        "SILVANA could not retrieve the requested "
+        "document knowledge. Please try again."
+    )
+
+    assert retrieval.retrieve_calls
+    assert manager.provider_calls == []
+
+
+def test_tool_action_never_invokes_document_retrieval(
+    monkeypatch,
+):
+    manager = install_fake_manager(monkeypatch)
+
+    retrieval = install_fake_retrieval(monkeypatch)
+
+    plan = ToolPlan(
+        status=ToolPlanStatus.CLARIFICATION_REQUIRED,
+        tool_name=None,
+        arguments={},
+        confidence=0.5,
+        message="Which directory should I list?",
+        matched_rule="filesystem_search",
+    )
+
+    install_fake_planner(monkeypatch, plan)
+
+    with TestClient(app) as client:
+        response = client.post(
+            "/api/v1/chat",
+            json={
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": "List files",
+                    }
+                ],
+                "knowledge_scope": "library",
+            },
+        )
+
+    assert response.status_code == 200
+    assert response.json()["provider"] == "internal"
+    assert response.json()["model"] == "tool-planner"
+
+    assert retrieval.retrieve_calls == []
+    assert manager.provider_calls == []
+
+
+def test_chat_refreshes_temporary_document_activity_without_retrieval(
+    monkeypatch,
+):
+    from backend.app.core.config import settings
+
+    conversation_id = uuid4()
+
+    retrieval = install_fake_retrieval(monkeypatch)
+    install_fake_manager(monkeypatch)
+
+    with TestClient(app) as client:
+        response = client.post(
+            "/api/v1/chat",
+            json={
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": "Hello SILVANA.",
+                    }
+                ],
+                "conversation_id": str(conversation_id),
+                "knowledge_scope": "none",
+            },
+        )
+
+    assert response.status_code == 200
+
+    assert retrieval.repository.touch_calls == [
+        {
+            "conversation_id": conversation_id,
+            "retention_hours": (
+                settings.SILVANA_DOCUMENT_TEMPORARY_RETENTION_HOURS
+            ),
+        }
+    ]
+
+    assert retrieval.retrieve_calls == []
+
+def parse_sse_event_payload(response_text, event_name):
+    """Extract and decode a named Server-Sent Event payload."""
+
+    for block in response_text.strip().split("\n\n"):
+        lines = block.splitlines()
+
+        event_line = next(
+            (
+                line
+                for line in lines
+                if line.startswith("event: ")
+            ),
+            None,
+        )
+
+        if event_line != f"event: {event_name}":
+            continue
+
+        data_line = next(
+            (
+                line
+                for line in lines
+                if line.startswith("data: ")
+            ),
+            None,
+        )
+
+        if data_line is None:
+            raise AssertionError(
+                f"SSE event '{event_name}' has no data payload."
+            )
+
+        return json.loads(data_line[len("data: "):])
+
+    raise AssertionError(
+        f"SSE event '{event_name}' was not found."
+    )
+
+
+def test_chat_stream_returns_document_citations_with_json_safe_uuids(
+    monkeypatch,
+):
+    document_id = uuid4()
+
+    retrieved_document = SimpleNamespace(
+        document_id=document_id,
+        filename="architecture.pdf",
+        scope=DocumentScope.PERSISTENT,
+        chunk_index=3,
+        content="SILVANA uses a modular backend architecture.",
+        page_number=5,
+        similarity=0.94,
+    )
+
+    retrieval = install_fake_retrieval(
+        monkeypatch,
+        FakeRetrievalService(
+            documents=[retrieved_document],
+        ),
+    )
+
+    install_fake_manager(monkeypatch)
+
+    with TestClient(app) as client:
+        response = client.post(
+            "/api/v1/chat/stream",
+            json={
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": "Explain the SILVANA architecture.",
+                    }
+                ],
+                "knowledge_scope": "library",
+            },
+        )
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith(
+        "text/event-stream"
+    )
+
+    response_payload = parse_sse_event_payload(
+        response.text,
+        "response",
+    )
+
+    assert response_payload["content"] == (
+        "Hello. I am SILVANA."
+    )
+
+    assert response_payload["sources"] == [
+        {
+            "ref": "S1",
+            "document_id": str(document_id),
+            "filename": "architecture.pdf",
+            "scope": "persistent",
+            "page_number": 5,
+            "chunk_index": 3,
+        }
+    ]
+
+    assert retrieval.retrieve_calls[0]["knowledge_scope"] == "library"
+
+    completed_state = parse_sse_event_payload(
+        response.text,
+        "state",
+    )
+
+    assert completed_state["state"] == "completed"
+
+
+def test_chat_stream_returns_retrieval_failure_as_sse_error(
+    monkeypatch,
+):
+    retrieval = install_fake_retrieval(
+        monkeypatch,
+        FakeRetrievalService(
+            error=RuntimeError(
+                "Simulated streaming retrieval failure"
+            ),
+        ),
+    )
+
+    manager = install_fake_manager(monkeypatch)
+
+    with TestClient(app) as client:
+        response = client.post(
+            "/api/v1/chat/stream",
+            json={
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": "Search my knowledge base.",
+                    }
+                ],
+                "knowledge_scope": "library",
+            },
+        )
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith(
+        "text/event-stream"
+    )
+
+    error_payload = parse_sse_event_payload(
+        response.text,
+        "error",
+    )
+
+    assert error_payload["status_code"] == 503
+
+    assert error_payload["detail"] == (
+        "SILVANA could not retrieve the requested "
+        "document knowledge. Please try again."
+    )
+
+    error_state = parse_sse_event_payload(
+        response.text,
+        "state",
+    )
+
+    assert error_state["state"] == "error"
+
+    assert retrieval.retrieve_calls
+    assert manager.provider_calls == []

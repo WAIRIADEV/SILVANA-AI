@@ -3,25 +3,69 @@ import { useEffect, useRef, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { sendStreamingChatMessage } from '../services/api/chat'
-import type { ChatMessage, ChatResponse } from '../types/api'
+import { deleteConversationDocuments } from '../services/api/documents'
+import type {
+  ChatMessage,
+  ChatResponse,
+  ChatSourceCitation,
+  KnowledgeScope,
+} from '../types/api'
 import type { AssistantState } from '../types/assistant'
 import './ChatInterface.css'
 
 interface DisplayMessage extends ChatMessage {
   id: string
   metadata?: Pick<ChatResponse, 'provider' | 'model'>
+  sources?: ChatSourceCitation[]
 }
 
 interface ChatInterfaceProps {
   onStateChange: (state: AssistantState) => void
+  conversationId: string
+  onConversationCleared: () => void
 }
 
-function ChatInterface({ onStateChange }: ChatInterfaceProps) {
+const KNOWLEDGE_SCOPE_OPTIONS: {
+  value: KnowledgeScope
+  label: string
+  description: string
+}[] = [
+  {
+    value: 'none',
+    label: 'GENERAL CHAT',
+    description: 'Answer without document retrieval',
+  },
+  {
+    value: 'conversation',
+    label: 'CONVERSATION',
+    description: 'Search temporary documents in this conversation',
+  },
+  {
+    value: 'library',
+    label: 'KNOWLEDGE LIBRARY',
+    description: 'Search persistent library documents',
+  },
+  {
+    value: 'both',
+    label: 'BOTH SOURCES',
+    description: 'Search conversation documents and the library',
+  },
+]
+
+function ChatInterface({
+  onStateChange,
+  conversationId,
+  onConversationCleared,
+}: ChatInterfaceProps) {
   const [messages, setMessages] = useState<DisplayMessage[]>([])
   const [input, setInput] = useState('')
   const [isSending, setIsSending] = useState(false)
+  const [isClearing, setIsClearing] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [clearError, setClearError] = useState<string | null>(null)
   const [lastResponse, setLastResponse] = useState<ChatResponse | null>(null)
+  const [knowledgeScope, setKnowledgeScope] =
+    useState<KnowledgeScope>('none')
 
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -31,12 +75,12 @@ function ChatInterface({ onStateChange }: ChatInterfaceProps) {
       behavior: 'smooth',
       block: 'end',
     })
-  }, [messages, isSending, error])
+  }, [messages, isSending, isClearing, error, clearError])
 
   async function submitMessage(content: string, retry = false) {
     const trimmedContent = content.trim()
 
-    if (!trimmedContent || isSending) return
+    if (!trimmedContent || isSending || isClearing) return
 
     const userMessage: DisplayMessage = {
       id: crypto.randomUUID(),
@@ -54,19 +98,35 @@ function ChatInterface({ onStateChange }: ChatInterfaceProps) {
     }
 
     setError(null)
+    setClearError(null)
     setIsSending(true)
     onStateChange('thinking')
 
     try {
+      const requestMessages = conversation
+        .slice(-50)
+        .filter(
+          (
+            message,
+          ): message is DisplayMessage & {
+            role: 'user' | 'assistant'
+          } =>
+            message.role === 'user' ||
+            message.role === 'assistant',
+        )
+        .map(({ role, content: messageContent }) => ({
+          role,
+          content: messageContent,
+        }))
+
       const response = await sendStreamingChatMessage(
         {
-          messages: conversation.slice(-50).map(({ role, content }) => ({
-            role,
-            content,
-          })),
+          messages: requestMessages,
           provider: 'groq',
           temperature: 0.7,
           max_output_tokens: 1024,
+          conversation_id: conversationId,
+          knowledge_scope: knowledgeScope,
         },
         onStateChange,
       )
@@ -79,6 +139,7 @@ function ChatInterface({ onStateChange }: ChatInterfaceProps) {
           provider: response.provider,
           model: response.model,
         },
+        sources: response.sources,
       }
 
       setMessages((current) => [...current, assistantMessage])
@@ -106,7 +167,7 @@ function ChatInterface({ onStateChange }: ChatInterfaceProps) {
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault()
 
-      if (!isSending) {
+      if (!isSending && !isClearing) {
         void submitMessage(input)
       }
     }
@@ -115,12 +176,14 @@ function ChatInterface({ onStateChange }: ChatInterfaceProps) {
   function handleInputChange(value: string) {
     setInput(value)
 
-    if (isSending) return
+    if (isSending || isClearing) return
 
     onStateChange(value.trim() ? 'listening' : 'idle')
   }
 
   function retryLastMessage() {
+    if (isSending || isClearing) return
+
     const lastUserMessage = [...messages]
       .reverse()
       .find((message) => message.role === 'user')
@@ -130,16 +193,69 @@ function ChatInterface({ onStateChange }: ChatInterfaceProps) {
     }
   }
 
-  function clearConversation() {
-    if (isSending) return
+  async function clearConversation() {
+    if (isSending || isClearing || !hasMessages) return
 
-    setMessages([])
-    setInput('')
-    setError(null)
-    setLastResponse(null)
-    onStateChange('idle')
+    setIsClearing(true)
+    setClearError(null)
 
-    textareaRef.current?.focus()
+    try {
+      await deleteConversationDocuments(conversationId)
+
+      setMessages([])
+      setInput('')
+      setError(null)
+      setLastResponse(null)
+
+      onConversationCleared()
+      onStateChange('idle')
+    } catch (err) {
+      setClearError(
+        err instanceof Error
+          ? err.message
+          : 'SILVANA could not clear this conversation.',
+      )
+    } finally {
+      setIsClearing(false)
+      textareaRef.current?.focus()
+    }
+  }
+
+  function renderSources(sources: ChatSourceCitation[]) {
+    if (sources.length === 0) return null
+
+    return (
+      <div className="message-sources">
+        <div className="message-sources-heading">
+          SOURCES / {sources.length}
+        </div>
+
+        <ul>
+          {sources.map((source) => (
+            <li
+              key={`${source.document_id}-${source.chunk_index}-${source.ref}`}
+            >
+              <span className="source-reference">{source.ref}</span>
+
+              <span className="source-details">
+                <strong>{source.filename}</strong>
+
+                <small>
+                  {source.scope === 'temporary'
+                    ? 'CONVERSATION DOCUMENT'
+                    : 'KNOWLEDGE LIBRARY'}
+
+                  {source.page_number !== null &&
+                    ` / PAGE ${source.page_number}`}
+
+                  {` / CHUNK ${source.chunk_index}`}
+                </small>
+              </span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    )
   }
 
   const hasMessages = messages.length > 0
@@ -162,11 +278,10 @@ function ChatInterface({ onStateChange }: ChatInterfaceProps) {
         <button
           className="clear-chat-button"
           type="button"
-          onClick={clearConversation}
-          disabled={!hasMessages || isSending}
+          onClick={() => void clearConversation()}
+          disabled={!hasMessages || isSending || isClearing}
         >
-          <span aria-hidden="true">↻</span>
-          CLEAR
+          {isClearing ? 'CLEARING...' : 'CLEAR'}
         </button>
       </div>
 
@@ -219,6 +334,8 @@ function ChatInterface({ onStateChange }: ChatInterfaceProps) {
                   {message.metadata.model}
                 </div>
               )}
+
+              {message.sources && renderSources(message.sources)}
             </div>
           </article>
         ))}
@@ -250,10 +367,19 @@ function ChatInterface({ onStateChange }: ChatInterfaceProps) {
             <button
               type="button"
               onClick={retryLastMessage}
-              disabled={isSending}
+              disabled={isSending || isClearing}
             >
               RETRY
             </button>
+          </div>
+        )}
+
+        {clearError && (
+          <div className="chat-error" role="alert">
+            <div>
+              <strong>CLEAR FAILED</strong>
+              <p>{clearError}</p>
+            </div>
           </div>
         )}
 
@@ -266,6 +392,36 @@ function ChatInterface({ onStateChange }: ChatInterfaceProps) {
           TEXT CHANNEL ACTIVE
         </div>
 
+        <div className="knowledge-scope-control">
+          <label htmlFor="knowledge-scope">
+            KNOWLEDGE CONTEXT
+          </label>
+
+          <select
+            id="knowledge-scope"
+            value={knowledgeScope}
+            onChange={(event) =>
+              setKnowledgeScope(event.target.value as KnowledgeScope)
+            }
+            disabled={isSending || isClearing}
+            aria-describedby="knowledge-scope-description"
+          >
+            {KNOWLEDGE_SCOPE_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+
+          <small id="knowledge-scope-description">
+            {
+              KNOWLEDGE_SCOPE_OPTIONS.find(
+                (option) => option.value === knowledgeScope,
+              )?.description
+            }
+          </small>
+        </div>
+
         <div className="composer-input-row">
           <textarea
             ref={textareaRef}
@@ -275,17 +431,17 @@ function ChatInterface({ onStateChange }: ChatInterfaceProps) {
             placeholder="Message SILVANA..."
             rows={2}
             maxLength={12000}
-            disabled={isSending}
+            disabled={isSending || isClearing}
             aria-label="Type your message"
           />
 
           <button
             className="send-message-button"
             type="submit"
-            disabled={!input.trim() || isSending}
+            disabled={!input.trim() || isSending || isClearing}
             aria-label="Send message"
           >
-            {isSending ? '...' : 'SEND →'}
+            {isSending ? '...' : 'SEND'}
           </button>
         </div>
 

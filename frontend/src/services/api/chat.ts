@@ -1,6 +1,10 @@
 
 import type { AssistantState } from '../../types/assistant'
-import type { ChatRequest, ChatResponse } from '../../types/api'
+import type {
+  ChatRequest,
+  ChatResponse,
+  ChatSourceCitation,
+} from '../../types/api'
 
 const API_BASE_URL = '/api/v1'
 
@@ -18,6 +22,50 @@ type StreamEvent =
   | { event: 'state'; data: { state: AssistantState } }
   | { event: 'response'; data: ChatResponse }
   | { event: 'error'; data: { detail?: string; status_code?: number } }
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    !Array.isArray(value)
+  )
+}
+
+function isNullableNumber(value: unknown): value is number | null {
+  return value === null || typeof value === 'number'
+}
+
+function isValidCitation(value: unknown): value is ChatSourceCitation {
+  if (!isRecord(value)) return false
+
+  return (
+    typeof value.ref === 'string' &&
+    typeof value.document_id === 'string' &&
+    typeof value.filename === 'string' &&
+    (value.scope === 'temporary' || value.scope === 'persistent') &&
+    (value.page_number === null ||
+      (typeof value.page_number === 'number' &&
+        Number.isInteger(value.page_number))) &&
+    typeof value.chunk_index === 'number' &&
+    Number.isInteger(value.chunk_index)
+  )
+}
+
+function isValidChatResponse(value: unknown): value is ChatResponse {
+  if (!isRecord(value)) return false
+
+  return (
+    typeof value.content === 'string' &&
+    typeof value.provider === 'string' &&
+    typeof value.model === 'string' &&
+    isNullableNumber(value.input_tokens) &&
+    isNullableNumber(value.output_tokens) &&
+    (typeof value.finish_reason === 'string' ||
+      value.finish_reason === null) &&
+    Array.isArray(value.sources) &&
+    value.sources.every(isValidCitation)
+  )
+}
 
 function parseEvent(block: string): StreamEvent | null {
   let eventName = ''
@@ -51,12 +99,12 @@ function parseEvent(block: string): StreamEvent | null {
     throw new Error('SILVANA received an invalid streaming event.')
   }
 
-  if (!data || typeof data !== 'object') {
+  if (!isRecord(data)) {
     throw new Error('SILVANA received an invalid streaming payload.')
   }
 
   if (eventName === 'state') {
-    const state = (data as { state?: unknown }).state
+    const state = data.state
 
     if (
       typeof state !== 'string' ||
@@ -72,38 +120,29 @@ function parseEvent(block: string): StreamEvent | null {
   }
 
   if (eventName === 'response') {
-    const response = data as Partial<ChatResponse>
-
-    if (
-      typeof response.content !== 'string' ||
-      typeof response.provider !== 'string' ||
-      typeof response.model !== 'string'
-    ) {
-      throw new Error('SILVANA received an invalid chat response.')
+    if (!isValidChatResponse(data)) {
+      throw new Error(
+        'SILVANA received an invalid chat response or citation payload.',
+      )
     }
 
     return {
       event: 'response',
-      data: response as ChatResponse,
+      data,
     }
   }
 
   if (eventName === 'error') {
-    const error = data as {
-      detail?: unknown
-      status_code?: unknown
-    }
-
     return {
       event: 'error',
       data: {
         detail:
-          typeof error.detail === 'string'
-            ? error.detail
+          typeof data.detail === 'string'
+            ? data.detail
             : 'SILVANA could not complete the request.',
         status_code:
-          typeof error.status_code === 'number'
-            ? error.status_code
+          typeof data.status_code === 'number'
+            ? data.status_code
             : undefined,
       },
     }
@@ -129,9 +168,9 @@ export async function sendStreamingChatMessage(
     let message = `API request failed: ${response.status}`
 
     try {
-      const body = await response.json()
+      const body: unknown = await response.json()
 
-      if (typeof body.detail === 'string') {
+      if (isRecord(body) && typeof body.detail === 'string') {
         message = body.detail
       }
     } catch {

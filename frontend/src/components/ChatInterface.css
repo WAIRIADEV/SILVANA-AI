@@ -625,3 +625,132 @@
     font-size: 11px;
   }
 }
+/* =========================================
+   DOCUMENT KNOWLEDGE SCOPE
+========================================= */
+
+.knowledge-scope-control {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 180px;
+  max-width: 260px;
+}
+
+.knowledge-scope-control label {
+  color: #8ceaff;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.knowledge-scope-control select {
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px solid rgba(76, 190, 225, 0.28);
+  border-radius: 7px;
+  outline: none;
+  background: rgba(8, 20, 32, 0.92);
+  color: #e6f7ff;
+  font: inherit;
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.knowledge-scope-control select:hover,
+.knowledge-scope-control select:focus {
+  border-color: #4cbad9;
+  box-shadow: 0 0 0 2px rgba(76, 186, 217, 0.12);
+}
+
+.knowledge-scope-control select option {
+  background: #0b1724;
+  color: #e6f7ff;
+}
+
+.knowledge-scope-control small {
+  color: rgba(190, 215, 230, 0.58);
+  font-size: 0.7rem;
+  line-height: 1.4;
+}
+
+/* =========================================
+   DOCUMENT SOURCE CITATIONS
+========================================= */
+
+.message-sources {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  margin-top: 16px;
+  padding: 12px 14px;
+  border: 1px solid rgba(76, 190, 225, 0.2);
+  border-left: 3px solid rgba(76, 186, 217, 0.75);
+  border-radius: 8px;
+  background: rgba(12, 31, 45, 0.55);
+}
+
+.message-sources h4 {
+  margin: 0;
+  color: #8ceaff;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.message-sources ul {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.message-sources li {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.source-reference {
+  color: #8ceaff;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.source-details {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px 9px;
+  color: rgba(220, 235, 245, 0.78);
+  font-size: 0.76rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.source-details strong {
+  color: #e6f7ff;
+  font-weight: 600;
+}
+
+.source-details small {
+  color: rgba(190, 215, 230, 0.58);
+  font-size: 0.7rem;
+}
+
+@media (max-width: 600px) {
+  .knowledge-scope-control {
+    width: 100%;
+    max-width: none;
+  }
+
+  .message-sources {
+    padding: 10px;
+  }
+}
