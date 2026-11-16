@@ -1,0 +1,23 @@
+﻿SILVANA RAG INTEGRATION TEST
+Document Reference: SILVANA-ORBIT-7429
+
+PROJECT IDENTITY
+The experimental research project is called Project ORBITAL-7429.
+
+PROJECT LEAD
+The project lead is named Mara Veldt.
+
+RESEARCH LOCATION
+The research facility is located in Nakuru, Kenya.
+
+TECHNICAL CONFIGURATION
+The prototype uses a fictional processor called the VX-731.
+Its internal memory allocation is exactly 13.75 gigabytes.
+The primary database is named NebulaStore.
+
+PROJECT TIMELINE
+The prototype evaluation begins on 18 August 2027.
+The final evaluation report is scheduled for 29 September 2027.
+
+VERIFICATION PHRASE
+The unique verification phrase is: SILVER COMET 9182.
