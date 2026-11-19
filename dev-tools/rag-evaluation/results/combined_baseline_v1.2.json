@@ -1,0 +1,913 @@
+{
+  "evaluation_type": "consolidated_rag_baseline",
+  "report_version": "1.0",
+  "dataset_name": "SILVANA RAG Baseline",
+  "dataset_version": "1.2",
+  "generated_at": "2026-11-19T22:11:28.334218+00:00",
+  "evaluation_environment": {
+    "database": "isolated evaluation database",
+    "embedding_model": "BAAI/bge-small-en-v1.5",
+    "retrieval_top_k": 5,
+    "providers": {
+      "gemini": 5,
+      "groq": 1
+    },
+    "models": {
+      "gemini-3.8-flash": 5,
+      "openai/gpt-oss-20b": 1
+    }
+  },
+  "metrics": {
+    "answer_generation": {
+      "total_cases": 6,
+      "answerable_cases": 4,
+      "abstention_cases": 2,
+      "answer_correctness_rate": 1.0,
+      "abstention_accuracy": 1.0,
+      "citation_validity_rate": 1.0,
+      "citation_relevance_rate": 1.0,
+      "citation_presence_rate_answerable": 1.0,
+      "citation_presence_rate_abstention": 0.5,
+      "provider_distribution": {
+        "gemini": 5,
+        "groq": 1
+      },
+      "model_distribution": {
+        "gemini-3.8-flash": 5,
+        "openai/gpt-oss-20b": 1
+      }
+    },
+    "retrieval": {
+      "positive_recall_at_1": 1.0,
+      "negative_recall_at_1": 1.0,
+      "positive_precision_at_1": 1.0,
+      "negative_precision_at_1": 1.0,
+      "positive_mrr_at_1": 1.0,
+      "negative_mrr_at_1": 1.0,
+      "positive_recall_at_3": 1.0,
+      "negative_recall_at_3": 1.0,
+      "positive_precision_at_3": 0.3333333333333333,
+      "negative_precision_at_3": 0.3333333333333333,
+      "positive_mrr_at_3": 1.0,
+      "negative_mrr_at_3": 1.0,
+      "positive_recall_at_5": 1.0,
+      "negative_recall_at_5": 1.0,
+      "positive_precision_at_5": 0.25,
+      "negative_precision_at_5": 0.25,
+      "positive_mrr_at_5": 1.0,
+      "negative_mrr_at_5": 1.0,
+      "abstention_evidence_retrieval_pass_rate": 1.0,
+      "answerable_case_count": 4,
+      "abstention_case_count": 2,
+      "abstention_cases_with_evidence": 2
+    }
+  },
+  "case_count": 6,
+  "case_ids": [
+    "water-001",
+    "water-002",
+    "water-003",
+    "water-004",
+    "water-005",
+    "water-006"
+  ],
+  "test_cases": [
+    {
+      "id": "water-001",
+      "question": "What is the water storage capacity of the Mwangaza Community Water Project?",
+      "expected_abstention": false,
+      "provider": "gemini",
+      "model": "gemini-3.8-flash",
+      "answer": "The Mwangaza Community Water Project has a total water storage capacity of 18,500 litres [S1].",
+      "answer_correct": true,
+      "expected_answer_found": true,
+      "matched_expected_facts": [],
+      "all_expected_facts_found": false,
+      "abstention_detected_heuristically": false,
+      "abstention_correct": true,
+      "citations": [
+        "S1"
+      ],
+      "valid_citations": [
+        "S1"
+      ],
+      "relevant_citations": [
+        "S1"
+      ],
+      "citation_presence": true,
+      "citation_validity": 1.0,
+      "citation_relevance": 1.0,
+      "unsupported_claims": {
+        "status": "not_evaluated",
+        "reason": "Requires semantic claim extraction and evidence entailment evaluation."
+      },
+      "sources": [
+        {
+          "ref": "S1",
+          "filename": "evaluation_water_project.txt",
+          "document_id": "39249403-33a7-40f4-a6c7-6b413f20269b",
+          "scope": "persistent",
+          "page_number": null,
+          "chunk_index": 0
+        },
+        {
+          "ref": "S2",
+          "filename": "baraka_water_project.txt",
+          "document_id": "77298a44-bd26-4100-b04e-ebc1ce120c8d",
+          "scope": "persistent",
+          "page_number": null,
+          "chunk_index": 0
+        },
+        {
+          "ref": "S3",
+          "filename": "mwangaza_operations.txt",
+          "document_id": "087d4a1d-bd86-4cc4-b4f5-d840c1efccf9",
+          "scope": "persistent",
+          "page_number": null,
+          "chunk_index": 0
+        },
+        {
+          "ref": "S4",
+          "filename": "mwangaza_funding.txt",
+          "document_id": "a4523773-aa6f-46e5-84fb-7e3881a2cb36",
+          "scope": "persistent",
+          "page_number": null,
+          "chunk_index": 0
+        }
+      ],
+      "answer_report_file": "answers_water-001_gemini.json",
+      "retrieval": {
+        "retrieved_count": 4,
+        "evidence_type_evaluated": "positive",
+        "metrics": {
+          "recall_at_1": 1.0,
+          "precision_at_1": 1.0,
+          "mrr_at_1": 1.0,
+          "recall_at_3": 1.0,
+          "precision_at_3": 0.3333333333333333,
+          "mrr_at_3": 1.0,
+          "recall_at_5": 1.0,
+          "precision_at_5": 0.25,
+          "mrr_at_5": 1.0
+        },
+        "negative_evidence_found": null,
+        "negative_evidence_coverage_at_5": null,
+        "abstention_retrieval_passed": null,
+        "retrieved_chunks": [
+          {
+            "rank": 1,
+            "filename": "evaluation_water_project.txt",
+            "chunk_index": 0,
+            "page_number": null,
+            "similarity": 0.9538435415707253,
+            "positive_relevant": true,
+            "negative_relevant": false,
+            "relevant": true,
+            "matched_positive_evidence": [
+              "the mwangaza community water project has a water storage capacity of 18,500 litres."
+            ],
+            "matched_negative_evidence": [],
+            "content": "Mwangaza Community Water Project\r\n\r\nThe Mwangaza Community Water Project has a water storage capacity of 18,500 litres.\r\n\r\nThe project serves households in its surrounding community. Its storage infrastructure helps maintain water availability for community use.\r\n\r\nThe documented storage capacity is 18,500 litres. This figure refers to the project's total stated water storage capacity."
+          },
+          {
+            "rank": 2,
+            "filename": "baraka_water_project.txt",
+            "chunk_index": 0,
+            "page_number": null,
+            "similarity": 0.8474734547880997,
+            "positive_relevant": false,
+            "negative_relevant": false,
+            "relevant": false,
+            "matched_positive_evidence": [],
+            "matched_negative_evidence": [],
+            "content": "Baraka Community Water Project\r\n\r\nThe Baraka Community Water Project has a total water storage capacity of 12,000 litres.\r\n\r\nThe project serves households in the Baraka community.\r\n\r\nIts storage infrastructure supports water distribution to nearby households.\r\n\r\nBaraka Community Water Project is separate from the Mwangaza Community Water Project."
+          },
+          {
+            "rank": 3,
+            "filename": "mwangaza_operations.txt",
+            "chunk_index": 0,
+            "page_number": null,
+            "similarity": 0.8272300823418274,
+            "positive_relevant": false,
+            "negative_relevant": false,
+            "relevant": false,
+            "matched_positive_evidence": [],
+            "matched_negative_evidence": [],
+            "content": "Mwangaza Community Water Project — Operations\r\n\r\nThe Mwangaza Community Water Project serves households in its surrounding community.\r\n\r\nThe project conducts water quality testing every month to monitor the condition of its supplied water.\r\n\r\nStorage tank inspections are conducted quarterly to identify structural problems and maintenance requirements.\r\n\r\nThe distribution network consists of pipelines connecting the storage infrastructure to surrounding households."
+          },
+          {
+            "rank": 4,
+            "filename": "mwangaza_funding.txt",
+            "chunk_index": 0,
+            "page_number": null,
+            "similarity": 0.7698024160123681,
+            "positive_relevant": false,
+            "negative_relevant": false,
+            "relevant": false,
+            "matched_positive_evidence": [],
+            "matched_negative_evidence": [],
+            "content": "Mwangaza Community Water Project — Funding Information\r\n\r\nThe initial construction of the Mwangaza Community Water Project was funded through a county development grant and community contributions.\r\n\r\nThe project received financial support for its initial infrastructure development.\r\n\r\nThis document does not specify the project's annual water treatment budget or its recurring water treatment expenditure."
+          }
+        ]
+      }
+    },
+    {
+      "id": "water-002",
+      "question": "How much water can the Mwangaza project store in total?",
+      "expected_abstention": false,
+      "provider": "gemini",
+      "model": "gemini-3.8-flash",
+      "answer": "The Mwangaza Community Water Project has a total water storage capacity of **18,500 litres** [S1].",
+      "answer_correct": true,
+      "expected_answer_found": true,
+      "matched_expected_facts": [],
+      "all_expected_facts_found": false,
+      "abstention_detected_heuristically": false,
+      "abstention_correct": true,
+      "citations": [
+        "S1"
+      ],
+      "valid_citations": [
+        "S1"
+      ],
+      "relevant_citations": [
+        "S1"
+      ],
+      "citation_presence": true,
+      "citation_validity": 1.0,
+      "citation_relevance": 1.0,
+      "unsupported_claims": {
+        "status": "not_evaluated",
+        "reason": "Requires semantic claim extraction and evidence entailment evaluation."
+      },
+      "sources": [
+        {
+          "ref": "S1",
+          "filename": "evaluation_water_project.txt",
+          "document_id": "39249403-33a7-40f4-a6c7-6b413f20269b",
+          "scope": "persistent",
+          "page_number": null,
+          "chunk_index": 0
+        },
+        {
+          "ref": "S2",
+          "filename": "baraka_water_project.txt",
+          "document_id": "77298a44-bd26-4100-b04e-ebc1ce120c8d",
+          "scope": "persistent",
+          "page_number": null,
+          "chunk_index": 0
+        },
+        {
+          "ref": "S3",
+          "filename": "mwangaza_operations.txt",
+          "document_id": "087d4a1d-bd86-4cc4-b4f5-d840c1efccf9",
+          "scope": "persistent",
+          "page_number": null,
+          "chunk_index": 0
+        },
+        {
+          "ref": "S4",
+          "filename": "mwangaza_funding.txt",
+          "document_id": "a4523773-aa6f-46e5-84fb-7e3881a2cb36",
+          "scope": "persistent",
+          "page_number": null,
+          "chunk_index": 0
+        }
+      ],
+      "answer_report_file": "answers_water-002_gemini.json",
+      "retrieval": {
+        "retrieved_count": 4,
+        "evidence_type_evaluated": "positive",
+        "metrics": {
+          "recall_at_1": 1.0,
+          "precision_at_1": 1.0,
+          "mrr_at_1": 1.0,
+          "recall_at_3": 1.0,
+          "precision_at_3": 0.3333333333333333,
+          "mrr_at_3": 1.0,
+          "recall_at_5": 1.0,
+          "precision_at_5": 0.25,
+          "mrr_at_5": 1.0
+        },
+        "negative_evidence_found": null,
+        "negative_evidence_coverage_at_5": null,
+        "abstention_retrieval_passed": null,
+        "retrieved_chunks": [
+          {
+            "rank": 1,
+            "filename": "evaluation_water_project.txt",
+            "chunk_index": 0,
+            "page_number": null,
+            "similarity": 0.9004647185766421,
+            "positive_relevant": true,
+            "negative_relevant": false,
+            "relevant": true,
+            "matched_positive_evidence": [
+              "the documented storage capacity is 18,500 litres. this figure refers to the project's total stated water storage capacity."
+            ],
+            "matched_negative_evidence": [],
+            "content": "Mwangaza Community Water Project\r\n\r\nThe Mwangaza Community Water Project has a water storage capacity of 18,500 litres.\r\n\r\nThe project serves households in its surrounding community. Its storage infrastructure helps maintain water availability for community use.\r\n\r\nThe documented storage capacity is 18,500 litres. This figure refers to the project's total stated water storage capacity."
+          },
+          {
+            "rank": 2,
+            "filename": "baraka_water_project.txt",
+            "chunk_index": 0,
+            "page_number": null,
+            "similarity": 0.8056192536994708,
+            "positive_relevant": false,
+            "negative_relevant": false,
+            "relevant": false,
+            "matched_positive_evidence": [],
+            "matched_negative_evidence": [],
+            "content": "Baraka Community Water Project\r\n\r\nThe Baraka Community Water Project has a total water storage capacity of 12,000 litres.\r\n\r\nThe project serves households in the Baraka community.\r\n\r\nIts storage infrastructure supports water distribution to nearby households.\r\n\r\nBaraka Community Water Project is separate from the Mwangaza Community Water Project."
+          },
+          {
+            "rank": 3,
+            "filename": "mwangaza_operations.txt",
+            "chunk_index": 0,
+            "page_number": null,
+            "similarity": 0.777104763745846,
+            "positive_relevant": false,
+            "negative_relevant": false,
+            "relevant": false,
+            "matched_positive_evidence": [],
+            "matched_negative_evidence": [],
+            "content": "Mwangaza Community Water Project — Operations\r\n\r\nThe Mwangaza Community Water Project serves households in its surrounding community.\r\n\r\nThe project conducts water quality testing every month to monitor the condition of its supplied water.\r\n\r\nStorage tank inspections are conducted quarterly to identify structural problems and maintenance requirements.\r\n\r\nThe distribution network consists of pipelines connecting the storage infrastructure to surrounding households."
+          },
+          {
+            "rank": 4,
+            "filename": "mwangaza_funding.txt",
+            "chunk_index": 0,
+            "page_number": null,
+            "similarity": 0.7356282878025804,
+            "positive_relevant": false,
+            "negative_relevant": false,
+            "relevant": false,
+            "matched_positive_evidence": [],
+            "matched_negative_evidence": [],
+            "content": "Mwangaza Community Water Project — Funding Information\r\n\r\nThe initial construction of the Mwangaza Community Water Project was funded through a county development grant and community contributions.\r\n\r\nThe project received financial support for its initial infrastructure development.\r\n\r\nThis document does not specify the project's annual water treatment budget or its recurring water treatment expenditure."
+          }
+        ]
+      }
+    },
+    {
+      "id": "water-003",
+      "question": "What is the annual water treatment budget of the Mwangaza Community Water Project?",
+      "expected_abstention": true,
+      "provider": "gemini",
+      "model": "gemini-3.8-flash",
+      "answer": "Based on the available records, the annual water treatment budget (or recurring water treatment expenditure) for the Mwangaza Community Water Project is not specified [S1].",
+      "answer_correct": null,
+      "expected_answer_found": null,
+      "matched_expected_facts": [],
+      "all_expected_facts_found": null,
+      "abstention_detected_heuristically": true,
+      "abstention_correct": true,
+      "citations": [
+        "S1"
+      ],
+      "valid_citations": [
+        "S1"
+      ],
+      "relevant_citations": [
+        "S1"
+      ],
+      "citation_presence": true,
+      "citation_validity": 1.0,
+      "citation_relevance": 1.0,
+      "unsupported_claims": {
+        "status": "not_evaluated",
+        "reason": "Requires semantic claim extraction and evidence entailment evaluation."
+      },
+      "sources": [
+        {
+          "ref": "S1",
+          "filename": "mwangaza_funding.txt",
+          "document_id": "a4523773-aa6f-46e5-84fb-7e3881a2cb36",
+          "scope": "persistent",
+          "page_number": null,
+          "chunk_index": 0
+        },
+        {
+          "ref": "S2",
+          "filename": "evaluation_water_project.txt",
+          "document_id": "39249403-33a7-40f4-a6c7-6b413f20269b",
+          "scope": "persistent",
+          "page_number": null,
+          "chunk_index": 0
+        },
+        {
+          "ref": "S3",
+          "filename": "mwangaza_operations.txt",
+          "document_id": "087d4a1d-bd86-4cc4-b4f5-d840c1efccf9",
+          "scope": "persistent",
+          "page_number": null,
+          "chunk_index": 0
+        },
+        {
+          "ref": "S4",
+          "filename": "baraka_water_project.txt",
+          "document_id": "77298a44-bd26-4100-b04e-ebc1ce120c8d",
+          "scope": "persistent",
+          "page_number": null,
+          "chunk_index": 0
+        }
+      ],
+      "answer_report_file": "answers_water-003_gemini.json",
+      "retrieval": {
+        "retrieved_count": 4,
+        "evidence_type_evaluated": "negative",
+        "metrics": {
+          "recall_at_1": 1.0,
+          "precision_at_1": 1.0,
+          "mrr_at_1": 1.0,
+          "recall_at_3": 1.0,
+          "precision_at_3": 0.3333333333333333,
+          "mrr_at_3": 1.0,
+          "recall_at_5": 1.0,
+          "precision_at_5": 0.25,
+          "mrr_at_5": 1.0
+        },
+        "negative_evidence_found": true,
+        "negative_evidence_coverage_at_5": 1.0,
+        "abstention_retrieval_passed": true,
+        "retrieved_chunks": [
+          {
+            "rank": 1,
+            "filename": "mwangaza_funding.txt",
+            "chunk_index": 0,
+            "page_number": null,
+            "similarity": 0.8375950095211533,
+            "positive_relevant": false,
+            "negative_relevant": true,
+            "relevant": true,
+            "matched_positive_evidence": [],
+            "matched_negative_evidence": [
+              "this document does not specify the project's annual water treatment budget or its recurring water treatment expenditure."
+            ],
+            "content": "Mwangaza Community Water Project — Funding Information\r\n\r\nThe initial construction of the Mwangaza Community Water Project was funded through a county development grant and community contributions.\r\n\r\nThe project received financial support for its initial infrastructure development.\r\n\r\nThis document does not specify the project's annual water treatment budget or its recurring water treatment expenditure."
+          },
+          {
+            "rank": 2,
+            "filename": "evaluation_water_project.txt",
+            "chunk_index": 0,
+            "page_number": null,
+            "similarity": 0.8090395672458023,
+            "positive_relevant": false,
+            "negative_relevant": false,
+            "relevant": false,
+            "matched_positive_evidence": [],
+            "matched_negative_evidence": [],
+            "content": "Mwangaza Community Water Project\r\n\r\nThe Mwangaza Community Water Project has a water storage capacity of 18,500 litres.\r\n\r\nThe project serves households in its surrounding community. Its storage infrastructure helps maintain water availability for community use.\r\n\r\nThe documented storage capacity is 18,500 litres. This figure refers to the project's total stated water storage capacity."
+          },
+          {
+            "rank": 3,
+            "filename": "mwangaza_operations.txt",
+            "chunk_index": 0,
+            "page_number": null,
+            "similarity": 0.7874927218781318,
+            "positive_relevant": false,
+            "negative_relevant": false,
+            "relevant": false,
+            "matched_positive_evidence": [],
+            "matched_negative_evidence": [],
+            "content": "Mwangaza Community Water Project — Operations\r\n\r\nThe Mwangaza Community Water Project serves households in its surrounding community.\r\n\r\nThe project conducts water quality testing every month to monitor the condition of its supplied water.\r\n\r\nStorage tank inspections are conducted quarterly to identify structural problems and maintenance requirements.\r\n\r\nThe distribution network consists of pipelines connecting the storage infrastructure to surrounding households."
+          },
+          {
+            "rank": 4,
+            "filename": "baraka_water_project.txt",
+            "chunk_index": 0,
+            "page_number": null,
+            "similarity": 0.7094775767820237,
+            "positive_relevant": false,
+            "negative_relevant": false,
+            "relevant": false,
+            "matched_positive_evidence": [],
+            "matched_negative_evidence": [],
+            "content": "Baraka Community Water Project\r\n\r\nThe Baraka Community Water Project has a total water storage capacity of 12,000 litres.\r\n\r\nThe project serves households in the Baraka community.\r\n\r\nIts storage infrastructure supports water distribution to nearby households.\r\n\r\nBaraka Community Water Project is separate from the Mwangaza Community Water Project."
+          }
+        ]
+      }
+    },
+    {
+      "id": "water-004",
+      "question": "How frequently does the Mwangaza project conduct water quality testing?",
+      "expected_abstention": false,
+      "provider": "gemini",
+      "model": "gemini-3.8-flash",
+      "answer": "The Mwangaza Community Water Project conducts water quality testing every month to monitor the condition of the supplied water [S1].",
+      "answer_correct": true,
+      "expected_answer_found": true,
+      "matched_expected_facts": [],
+      "all_expected_facts_found": false,
+      "abstention_detected_heuristically": false,
+      "abstention_correct": true,
+      "citations": [
+        "S1"
+      ],
+      "valid_citations": [
+        "S1"
+      ],
+      "relevant_citations": [
+        "S1"
+      ],
+      "citation_presence": true,
+      "citation_validity": 1.0,
+      "citation_relevance": 1.0,
+      "unsupported_claims": {
+        "status": "not_evaluated",
+        "reason": "Requires semantic claim extraction and evidence entailment evaluation."
+      },
+      "sources": [
+        {
+          "ref": "S1",
+          "filename": "mwangaza_operations.txt",
+          "document_id": "087d4a1d-bd86-4cc4-b4f5-d840c1efccf9",
+          "scope": "persistent",
+          "page_number": null,
+          "chunk_index": 0
+        },
+        {
+          "ref": "S2",
+          "filename": "evaluation_water_project.txt",
+          "document_id": "39249403-33a7-40f4-a6c7-6b413f20269b",
+          "scope": "persistent",
+          "page_number": null,
+          "chunk_index": 0
+        },
+        {
+          "ref": "S3",
+          "filename": "mwangaza_funding.txt",
+          "document_id": "a4523773-aa6f-46e5-84fb-7e3881a2cb36",
+          "scope": "persistent",
+          "page_number": null,
+          "chunk_index": 0
+        },
+        {
+          "ref": "S4",
+          "filename": "baraka_water_project.txt",
+          "document_id": "77298a44-bd26-4100-b04e-ebc1ce120c8d",
+          "scope": "persistent",
+          "page_number": null,
+          "chunk_index": 0
+        }
+      ],
+      "answer_report_file": "answers_water-004_gemini.json",
+      "retrieval": {
+        "retrieved_count": 4,
+        "evidence_type_evaluated": "positive",
+        "metrics": {
+          "recall_at_1": 1.0,
+          "precision_at_1": 1.0,
+          "mrr_at_1": 1.0,
+          "recall_at_3": 1.0,
+          "precision_at_3": 0.3333333333333333,
+          "mrr_at_3": 1.0,
+          "recall_at_5": 1.0,
+          "precision_at_5": 0.25,
+          "mrr_at_5": 1.0
+        },
+        "negative_evidence_found": null,
+        "negative_evidence_coverage_at_5": null,
+        "abstention_retrieval_passed": null,
+        "retrieved_chunks": [
+          {
+            "rank": 1,
+            "filename": "mwangaza_operations.txt",
+            "chunk_index": 0,
+            "page_number": null,
+            "similarity": 0.854797078660857,
+            "positive_relevant": true,
+            "negative_relevant": false,
+            "relevant": true,
+            "matched_positive_evidence": [
+              "the project conducts water quality testing every month to monitor the condition of its supplied water."
+            ],
+            "matched_negative_evidence": [],
+            "content": "Mwangaza Community Water Project — Operations\r\n\r\nThe Mwangaza Community Water Project serves households in its surrounding community.\r\n\r\nThe project conducts water quality testing every month to monitor the condition of its supplied water.\r\n\r\nStorage tank inspections are conducted quarterly to identify structural problems and maintenance requirements.\r\n\r\nThe distribution network consists of pipelines connecting the storage infrastructure to surrounding households."
+          },
+          {
+            "rank": 2,
+            "filename": "evaluation_water_project.txt",
+            "chunk_index": 0,
+            "page_number": null,
+            "similarity": 0.7668334261190144,
+            "positive_relevant": false,
+            "negative_relevant": false,
+            "relevant": false,
+            "matched_positive_evidence": [],
+            "matched_negative_evidence": [],
+            "content": "Mwangaza Community Water Project\r\n\r\nThe Mwangaza Community Water Project has a water storage capacity of 18,500 litres.\r\n\r\nThe project serves households in its surrounding community. Its storage infrastructure helps maintain water availability for community use.\r\n\r\nThe documented storage capacity is 18,500 litres. This figure refers to the project's total stated water storage capacity."
+          },
+          {
+            "rank": 3,
+            "filename": "mwangaza_funding.txt",
+            "chunk_index": 0,
+            "page_number": null,
+            "similarity": 0.736508870285289,
+            "positive_relevant": false,
+            "negative_relevant": false,
+            "relevant": false,
+            "matched_positive_evidence": [],
+            "matched_negative_evidence": [],
+            "content": "Mwangaza Community Water Project — Funding Information\r\n\r\nThe initial construction of the Mwangaza Community Water Project was funded through a county development grant and community contributions.\r\n\r\nThe project received financial support for its initial infrastructure development.\r\n\r\nThis document does not specify the project's annual water treatment budget or its recurring water treatment expenditure."
+          },
+          {
+            "rank": 4,
+            "filename": "baraka_water_project.txt",
+            "chunk_index": 0,
+            "page_number": null,
+            "similarity": 0.6769990811866698,
+            "positive_relevant": false,
+            "negative_relevant": false,
+            "relevant": false,
+            "matched_positive_evidence": [],
+            "matched_negative_evidence": [],
+            "content": "Baraka Community Water Project\r\n\r\nThe Baraka Community Water Project has a total water storage capacity of 12,000 litres.\r\n\r\nThe project serves households in the Baraka community.\r\n\r\nIts storage infrastructure supports water distribution to nearby households.\r\n\r\nBaraka Community Water Project is separate from the Mwangaza Community Water Project."
+          }
+        ]
+      }
+    },
+    {
+      "id": "water-005",
+      "question": "What is the total storage capacity of the Baraka Community Water Project?",
+      "expected_abstention": false,
+      "provider": "gemini",
+      "model": "gemini-3.8-flash",
+      "answer": "The Baraka Community Water Project has a total water storage capacity of 12,000 litres [S1].",
+      "answer_correct": true,
+      "expected_answer_found": true,
+      "matched_expected_facts": [],
+      "all_expected_facts_found": false,
+      "abstention_detected_heuristically": false,
+      "abstention_correct": true,
+      "citations": [
+        "S1"
+      ],
+      "valid_citations": [
+        "S1"
+      ],
+      "relevant_citations": [
+        "S1"
+      ],
+      "citation_presence": true,
+      "citation_validity": 1.0,
+      "citation_relevance": 1.0,
+      "unsupported_claims": {
+        "status": "not_evaluated",
+        "reason": "Requires semantic claim extraction and evidence entailment evaluation."
+      },
+      "sources": [
+        {
+          "ref": "S1",
+          "filename": "baraka_water_project.txt",
+          "document_id": "77298a44-bd26-4100-b04e-ebc1ce120c8d",
+          "scope": "persistent",
+          "page_number": null,
+          "chunk_index": 0
+        },
+        {
+          "ref": "S2",
+          "filename": "evaluation_water_project.txt",
+          "document_id": "39249403-33a7-40f4-a6c7-6b413f20269b",
+          "scope": "persistent",
+          "page_number": null,
+          "chunk_index": 0
+        },
+        {
+          "ref": "S3",
+          "filename": "mwangaza_operations.txt",
+          "document_id": "087d4a1d-bd86-4cc4-b4f5-d840c1efccf9",
+          "scope": "persistent",
+          "page_number": null,
+          "chunk_index": 0
+        },
+        {
+          "ref": "S4",
+          "filename": "mwangaza_funding.txt",
+          "document_id": "a4523773-aa6f-46e5-84fb-7e3881a2cb36",
+          "scope": "persistent",
+          "page_number": null,
+          "chunk_index": 0
+        }
+      ],
+      "answer_report_file": "answers_water-005_gemini.json",
+      "retrieval": {
+        "retrieved_count": 4,
+        "evidence_type_evaluated": "positive",
+        "metrics": {
+          "recall_at_1": 1.0,
+          "precision_at_1": 1.0,
+          "mrr_at_1": 1.0,
+          "recall_at_3": 1.0,
+          "precision_at_3": 0.3333333333333333,
+          "mrr_at_3": 1.0,
+          "recall_at_5": 1.0,
+          "precision_at_5": 0.25,
+          "mrr_at_5": 1.0
+        },
+        "negative_evidence_found": null,
+        "negative_evidence_coverage_at_5": null,
+        "abstention_retrieval_passed": null,
+        "retrieved_chunks": [
+          {
+            "rank": 1,
+            "filename": "baraka_water_project.txt",
+            "chunk_index": 0,
+            "page_number": null,
+            "similarity": 0.930400475565312,
+            "positive_relevant": true,
+            "negative_relevant": false,
+            "relevant": true,
+            "matched_positive_evidence": [
+              "the baraka community water project has a total water storage capacity of 12,000 litres."
+            ],
+            "matched_negative_evidence": [],
+            "content": "Baraka Community Water Project\r\n\r\nThe Baraka Community Water Project has a total water storage capacity of 12,000 litres.\r\n\r\nThe project serves households in the Baraka community.\r\n\r\nIts storage infrastructure supports water distribution to nearby households.\r\n\r\nBaraka Community Water Project is separate from the Mwangaza Community Water Project."
+          },
+          {
+            "rank": 2,
+            "filename": "evaluation_water_project.txt",
+            "chunk_index": 0,
+            "page_number": null,
+            "similarity": 0.7874051949621048,
+            "positive_relevant": false,
+            "negative_relevant": false,
+            "relevant": false,
+            "matched_positive_evidence": [],
+            "matched_negative_evidence": [],
+            "content": "Mwangaza Community Water Project\r\n\r\nThe Mwangaza Community Water Project has a water storage capacity of 18,500 litres.\r\n\r\nThe project serves households in its surrounding community. Its storage infrastructure helps maintain water availability for community use.\r\n\r\nThe documented storage capacity is 18,500 litres. This figure refers to the project's total stated water storage capacity."
+          },
+          {
+            "rank": 3,
+            "filename": "mwangaza_operations.txt",
+            "chunk_index": 0,
+            "page_number": null,
+            "similarity": 0.6528290718922766,
+            "positive_relevant": false,
+            "negative_relevant": false,
+            "relevant": false,
+            "matched_positive_evidence": [],
+            "matched_negative_evidence": [],
+            "content": "Mwangaza Community Water Project — Operations\r\n\r\nThe Mwangaza Community Water Project serves households in its surrounding community.\r\n\r\nThe project conducts water quality testing every month to monitor the condition of its supplied water.\r\n\r\nStorage tank inspections are conducted quarterly to identify structural problems and maintenance requirements.\r\n\r\nThe distribution network consists of pipelines connecting the storage infrastructure to surrounding households."
+          },
+          {
+            "rank": 4,
+            "filename": "mwangaza_funding.txt",
+            "chunk_index": 0,
+            "page_number": null,
+            "similarity": 0.6270134613410829,
+            "positive_relevant": false,
+            "negative_relevant": false,
+            "relevant": false,
+            "matched_positive_evidence": [],
+            "matched_negative_evidence": [],
+            "content": "Mwangaza Community Water Project — Funding Information\r\n\r\nThe initial construction of the Mwangaza Community Water Project was funded through a county development grant and community contributions.\r\n\r\nThe project received financial support for its initial infrastructure development.\r\n\r\nThis document does not specify the project's annual water treatment budget or its recurring water treatment expenditure."
+          }
+        ]
+      }
+    },
+    {
+      "id": "water-006",
+      "question": "What is the annual water treatment expenditure of the Mwangaza project?",
+      "expected_abstention": true,
+      "provider": "groq",
+      "model": "openai/gpt-oss-20b",
+      "answer": "I’m sorry, but none of the retrieved documents contain information about the Mwangaza Community Water Project’s annual water‑treatment expenditure.",
+      "answer_correct": null,
+      "expected_answer_found": null,
+      "matched_expected_facts": [],
+      "all_expected_facts_found": null,
+      "abstention_detected_heuristically": true,
+      "abstention_correct": true,
+      "citations": [],
+      "valid_citations": [],
+      "relevant_citations": [],
+      "citation_presence": false,
+      "citation_validity": null,
+      "citation_relevance": null,
+      "unsupported_claims": {
+        "status": "not_evaluated",
+        "reason": "Requires semantic claim extraction and evidence entailment evaluation."
+      },
+      "sources": [
+        {
+          "ref": "S1",
+          "filename": "mwangaza_funding.txt",
+          "document_id": "a4523773-aa6f-46e5-84fb-7e3881a2cb36",
+          "scope": "persistent",
+          "page_number": null,
+          "chunk_index": 0
+        },
+        {
+          "ref": "S2",
+          "filename": "evaluation_water_project.txt",
+          "document_id": "39249403-33a7-40f4-a6c7-6b413f20269b",
+          "scope": "persistent",
+          "page_number": null,
+          "chunk_index": 0
+        },
+        {
+          "ref": "S3",
+          "filename": "mwangaza_operations.txt",
+          "document_id": "087d4a1d-bd86-4cc4-b4f5-d840c1efccf9",
+          "scope": "persistent",
+          "page_number": null,
+          "chunk_index": 0
+        },
+        {
+          "ref": "S4",
+          "filename": "baraka_water_project.txt",
+          "document_id": "77298a44-bd26-4100-b04e-ebc1ce120c8d",
+          "scope": "persistent",
+          "page_number": null,
+          "chunk_index": 0
+        }
+      ],
+      "answer_report_file": "answers_water-006_groq.json",
+      "retrieval": {
+        "retrieved_count": 4,
+        "evidence_type_evaluated": "negative",
+        "metrics": {
+          "recall_at_1": 1.0,
+          "precision_at_1": 1.0,
+          "mrr_at_1": 1.0,
+          "recall_at_3": 1.0,
+          "precision_at_3": 0.3333333333333333,
+          "mrr_at_3": 1.0,
+          "recall_at_5": 1.0,
+          "precision_at_5": 0.25,
+          "mrr_at_5": 1.0
+        },
+        "negative_evidence_found": true,
+        "negative_evidence_coverage_at_5": 1.0,
+        "abstention_retrieval_passed": true,
+        "retrieved_chunks": [
+          {
+            "rank": 1,
+            "filename": "mwangaza_funding.txt",
+            "chunk_index": 0,
+            "page_number": null,
+            "similarity": 0.816035646366576,
+            "positive_relevant": false,
+            "negative_relevant": true,
+            "relevant": true,
+            "matched_positive_evidence": [],
+            "matched_negative_evidence": [
+              "this document does not specify the project's annual water treatment budget or its recurring water treatment expenditure."
+            ],
+            "content": "Mwangaza Community Water Project — Funding Information\r\n\r\nThe initial construction of the Mwangaza Community Water Project was funded through a county development grant and community contributions.\r\n\r\nThe project received financial support for its initial infrastructure development.\r\n\r\nThis document does not specify the project's annual water treatment budget or its recurring water treatment expenditure."
+          },
+          {
+            "rank": 2,
+            "filename": "evaluation_water_project.txt",
+            "chunk_index": 0,
+            "page_number": null,
+            "similarity": 0.7893471795693202,
+            "positive_relevant": false,
+            "negative_relevant": false,
+            "relevant": false,
+            "matched_positive_evidence": [],
+            "matched_negative_evidence": [],
+            "content": "Mwangaza Community Water Project\r\n\r\nThe Mwangaza Community Water Project has a water storage capacity of 18,500 litres.\r\n\r\nThe project serves households in its surrounding community. Its storage infrastructure helps maintain water availability for community use.\r\n\r\nThe documented storage capacity is 18,500 litres. This figure refers to the project's total stated water storage capacity."
+          },
+          {
+            "rank": 3,
+            "filename": "mwangaza_operations.txt",
+            "chunk_index": 0,
+            "page_number": null,
+            "similarity": 0.7685189158707517,
+            "positive_relevant": false,
+            "negative_relevant": false,
+            "relevant": false,
+            "matched_positive_evidence": [],
+            "matched_negative_evidence": [],
+            "content": "Mwangaza Community Water Project — Operations\r\n\r\nThe Mwangaza Community Water Project serves households in its surrounding community.\r\n\r\nThe project conducts water quality testing every month to monitor the condition of its supplied water.\r\n\r\nStorage tank inspections are conducted quarterly to identify structural problems and maintenance requirements.\r\n\r\nThe distribution network consists of pipelines connecting the storage infrastructure to surrounding households."
+          },
+          {
+            "rank": 4,
+            "filename": "baraka_water_project.txt",
+            "chunk_index": 0,
+            "page_number": null,
+            "similarity": 0.6903859187563067,
+            "positive_relevant": false,
+            "negative_relevant": false,
+            "relevant": false,
+            "matched_positive_evidence": [],
+            "matched_negative_evidence": [],
+            "content": "Baraka Community Water Project\r\n\r\nThe Baraka Community Water Project has a total water storage capacity of 12,000 litres.\r\n\r\nThe project serves households in the Baraka community.\r\n\r\nIts storage infrastructure supports water distribution to nearby households.\r\n\r\nBaraka Community Water Project is separate from the Mwangaza Community Water Project."
+          }
+        ]
+      }
+    }
+  ],
+  "evaluation_notes": [
+    "Legacy citation_completeness values were normalized to citation_presence.",
+    "Citation validity measures references against the sources returned by the production pipeline.",
+    "Citation relevance measures references against the annotated expected evidence documents.",
+    "Correct abstentions do not require citations.",
+    "Answer correctness uses deterministic expected-answer and expected-fact matching, not semantic entailment.",
+    "Retrieval metrics use annotated evidence matching and should not be interpreted as general semantic relevance measurements.",
+    "Provider and model attribution is retained for every answer-generation case."
+  ]
+}

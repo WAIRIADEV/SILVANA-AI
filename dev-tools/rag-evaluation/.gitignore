@@ -1,0 +1,15 @@
+﻿# Python-generated files
+__pycache__/
+*.py[cod]
+
+# Isolated evaluation database and indexed documents
+data/
+
+# Generated evaluation reports
+results/*
+!results/.gitkeep
+
+# Preserve versioned benchmark snapshots
+!results/retrieval_smoke_baseline_v1.1.json
+!results/retrieval_baseline_v1.2.json
+!results/combined_baseline_v1.2.json

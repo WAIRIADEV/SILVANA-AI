@@ -1,0 +1,108 @@
+
+{
+  "dataset_name": "SILVANA RAG Baseline",
+  "dataset_version": "1.2",
+  "description": "Baseline benchmark for factual retrieval, paraphrasing, entity discrimination, evidence relevance, and evidence-grounded abstention.",
+  "test_cases": [
+    {
+      "id": "water-001",
+      "question": "What is the water storage capacity of the Mwangaza Community Water Project?",
+      "expected_answer": "18,500 litres",
+      "expected_facts": [
+        "The water storage capacity is 18,500 litres."
+      ],
+      "relevant_documents": [
+        "evaluation_water_project.txt"
+      ],
+      "relevant_evidence": [
+        "The Mwangaza Community Water Project has a water storage capacity of 18,500 litres."
+      ],
+      "abstention_evidence": [],
+      "knowledge_scope": "library",
+      "expected_abstention": false
+    },
+    {
+      "id": "water-002",
+      "question": "How much water can the Mwangaza project store in total?",
+      "expected_answer": "18,500 litres",
+      "expected_facts": [
+        "The total stated water storage capacity is 18,500 litres."
+      ],
+      "relevant_documents": [
+        "evaluation_water_project.txt"
+      ],
+      "relevant_evidence": [
+        "The documented storage capacity is 18,500 litres. This figure refers to the project's total stated water storage capacity."
+      ],
+      "abstention_evidence": [],
+      "knowledge_scope": "library",
+      "expected_abstention": false
+    },
+    {
+      "id": "water-003",
+      "question": "What is the annual water treatment budget of the Mwangaza Community Water Project?",
+      "expected_answer": null,
+      "expected_facts": [],
+      "relevant_documents": [],
+      "relevant_evidence": [],
+      "abstention_evidence": [
+        {
+          "document": "mwangaza_funding.txt",
+          "evidence": "This document does not specify the project's annual water treatment budget or its recurring water treatment expenditure."
+        }
+      ],
+      "knowledge_scope": "library",
+      "expected_abstention": true
+    },
+    {
+      "id": "water-004",
+      "question": "How frequently does the Mwangaza project conduct water quality testing?",
+      "expected_answer": "Every month.",
+      "expected_facts": [
+        "Water quality testing is conducted every month."
+      ],
+      "relevant_documents": [
+        "mwangaza_operations.txt"
+      ],
+      "relevant_evidence": [
+        "The project conducts water quality testing every month to monitor the condition of its supplied water."
+      ],
+      "abstention_evidence": [],
+      "knowledge_scope": "library",
+      "expected_abstention": false
+    },
+    {
+      "id": "water-005",
+      "question": "What is the total storage capacity of the Baraka Community Water Project?",
+      "expected_answer": "12,000 litres",
+      "expected_facts": [
+        "Baraka has a total water storage capacity of 12,000 litres."
+      ],
+      "relevant_documents": [
+        "baraka_water_project.txt"
+      ],
+      "relevant_evidence": [
+        "The Baraka Community Water Project has a total water storage capacity of 12,000 litres."
+      ],
+      "abstention_evidence": [],
+      "knowledge_scope": "library",
+      "expected_abstention": false
+    },
+    {
+      "id": "water-006",
+      "question": "What is the annual water treatment expenditure of the Mwangaza project?",
+      "expected_answer": null,
+      "expected_facts": [],
+      "relevant_documents": [],
+      "relevant_evidence": [],
+      "abstention_evidence": [
+        {
+          "document": "mwangaza_funding.txt",
+          "evidence": "This document does not specify the project's annual water treatment budget or its recurring water treatment expenditure."
+        }
+      ],
+      "knowledge_scope": "library",
+      "expected_abstention": true
+    }
+  ]
+}
